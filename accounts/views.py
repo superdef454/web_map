@@ -24,17 +24,17 @@ class AccountLogin(LoginView):
         if url:
             return url
         else:
-            return reverse_lazy("PetriNET:main_map")
+            return reverse_lazy("PetriNET:main_index")
 
 
 class AccountLogout(LogoutView):
-    next_page = reverse_lazy('PetriNET:main_map')
+    next_page = reverse_lazy('PetriNET:main_index')
 
 
 class AccountRegister(CreateView):
     form_class = UserCreationForm
     template_name = 'accounts/registration.html'
-    success_url = reverse_lazy('PetriNET:main_map')
+    success_url = reverse_lazy('PetriNET:main_index')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

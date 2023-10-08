@@ -21,9 +21,9 @@
     {% if request.user.is_authenticated %}
     Привет, {{ request.user }}!
     <br>
-    {% if request.user.is_staff %}
     <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
-    {% endif %}
+    <li><a href="{% url 'PetriNET:leaflet' %}">Открыть карту</a></li>
+
     <li><a href="{% url 'accounts:logout' %}">Выйти</a></li>
     {% else %}
     <li><a href="{% url 'accounts:login' %}">Войти</a></li>

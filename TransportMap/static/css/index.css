@@ -1,4 +1,16 @@
-.title{
-    text-align: center;
-    margin: 50px 0;
+#map { 
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+.left-panel{
+    width: 300px;
+    height: 98%;            
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 900;
+    margin: 10px 0 20px 55px;
+    align-items: center;
 }

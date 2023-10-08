@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="{% static 'css/index.css' %}">
+{% endblock %}
+{% block js %}
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+    integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+    crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+    integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+    crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+    integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+    crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{{ BSs|json_script:"BSs_json" }}
+{{ citys|json_script:"citys_json" }}
+{% endblock %}
+
+{% block body %}
+<div id="map">
+    <div class="left-panel">
+        <div class="container-fluid d-flex h-100 justify-content-center align-items-center">
+            <div class="row shadow-sm">
+                <div class="dropdown mb-3">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton"
+                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Выберите город
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                        {% if citys %}
+                        {% for city in citys %}
+                        <button class="dropdown-item" id="ChoiceCity" value="{{city.id}}">{{city.name}}</button>
+                        {% endfor %}
+                        {% else %}
+                        <a class="dropdown-item" href="{% url 'admin:index' %}">Добавить</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="BusStopName" placeholder="Название остановки"
+                        aria-label="Имя получателя" aria-describedby="basic-addon2">
+                    <div class="input-group-append">
+                        <button id="BusStopAdd" class="btn btn-primary" type="button">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block endjs %}
+<script>
+    let ActionOnClick = ""
+    let LastClickCord = []
+    let TempMarker
+    let CurrentCity
+
+    var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 13);
+    L.control.attribution({ prefix: 'Маршрутно-транспортные сети' }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        // attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    let BSs = JSON.parse(document.getElementById('BSs_json').textContent)
+    let citys = JSON.parse(document.getElementById('citys_json').textContent)
+
+
+    BSs.forEach(BS => {
+        L.marker([BS.latitude, BS.longitude]).addTo(map).bindPopup(BS.name);
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    $("#BusStopAdd").click(function () {
+        $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+        if (CurrentCity) {
+            let BusStopName = $("#BusStopName").val()
+            if (BusStopName) {
+                if (ActionOnClick == 'AddTempMarker' & typeof TempMarker !== "undefined") {
+                    $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+                    $(this).text('+');
+                    const csrftoken = getCookie('csrftoken');
+                    $.ajax({
+                        url: '{% url "PetriNET:ajax_bs_add" %}',
+                        method: 'post',
+                        dataType: 'html',
+                        headers: { 'X-CSRFToken': csrftoken },
+                        data: {
+                            name: BusStopName,
+                            lat: TempMarker.getLatLng().lat,
+                            lng: TempMarker.getLatLng().lng,
+                            city_id: CurrentCity.id,
+                        },
+                    });
+                    L.marker(TempMarker.getLatLng()).addTo(map)
+                    TempMarker.remove();
+                    TempMarker = null;
+                    ActionOnClick = "";
+                    $("#BusStopName").val('')
+                    return
+                };
+                if (ActionOnClick == 'AddTempMarker') {
+                    $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+                    $(this).text('+');
+                    ActionOnClick = "";
+                    return
+                }
+                $(this).attr('style', 'background-color: #dc3545; border-color: #dc3545;');
+                $(this).text('x');
+                ActionOnClick = 'AddTempMarker'
+            }
+            else {
+                alert('Введите название остановки!');
+            }
+        }
+        else {
+            alert('Выберите город');
+        }
+    });
+
+    $("#ChoiceCity").click(function () {
+        let CityID = $(this).val()
+        let City = citys.find(el => el.id == CityID)
+        CurrentCity = City
+        $("#dropdownMenuButton").text(City.name)
+        map.setView([City.latitude, City.longitude], 13);
+    });
+
+    map.on('dblclick', (event) => {
+        LastClickCord = [event.latlng.lat, event.latlng.lng]
+        if (ActionOnClick == 'AddTempMarker') {
+            if (TempMarker) {
+                TempMarker.remove()
+            }
+            TempMarker = L.marker(LastClickCord, { opacity: 0.5 }).addTo(map).on('click', (event) => {
+                TempMarker.remove();
+                TempMarker = null;
+                $("#BusStopAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
+                $("#BusStopAdd").text('+');
+                ActionOnClick = "";
+            })
+            $("#BusStopAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
+            $("#BusStopAdd").text('✓');
+        }
+    })
+</script>
+{% endblock %}
