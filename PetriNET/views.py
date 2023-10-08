@@ -32,10 +32,24 @@ def ajax_bs_add(request):
             return JsonResponse({'error': 0})
     return JsonResponse({})
 
+def ajax_bs_get(request):
+    if request.method == "POST":
+        if request.user.is_authenticated:
+            city_id = request.POST.get('city_id')
+            if not city_id:
+                return JsonResponse({
+                    'error': 1,
+                    'error_messgae': 'Ошибка заполнения данных'
+                })
+            return JsonResponse({
+                'error': 0,
+                'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude'))
+                })
+    return JsonResponse({})
+
 def leaflet(request):
     responce = {}
     responce['citys'] = list(City.objects.values('name', 'latitude', 'longitude', 'id'))
-    responce['BSs'] = list(BusStop.objects.values('name', 'latitude', 'longitude')[:100])
     return render(
         request,
         'PetriNET/leaflet/index.html',

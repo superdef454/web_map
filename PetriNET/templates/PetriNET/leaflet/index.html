@@ -21,7 +21,6 @@
     crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-{{ BSs|json_script:"BSs_json" }}
 {{ citys|json_script:"citys_json" }}
 {% endblock %}
 
@@ -38,7 +37,7 @@
                     <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                         {% if citys %}
                         {% for city in citys %}
-                        <button class="dropdown-item" id="ChoiceCity" value="{{city.id}}">{{city.name}}</button>
+                        <button class="dropdown-item" onclick="ChoiceCity({{city.id}})">{{city.name}}</button>
                         {% endfor %}
                         {% else %}
                         <a class="dropdown-item" href="{% url 'admin:index' %}">Добавить</a>
@@ -70,16 +69,11 @@
     L.control.attribution({ prefix: 'Маршрутно-транспортные сети' }).addTo(map);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        // attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    let BSs = JSON.parse(document.getElementById('BSs_json').textContent)
+    var markers = L.layerGroup().addTo(map);
+
     let citys = JSON.parse(document.getElementById('citys_json').textContent)
-
-
-    BSs.forEach(BS => {
-        L.marker([BS.latitude, BS.longitude]).addTo(map).bindPopup(BS.name);
-    });
 
     function getCookie(name) {
         let cookieValue = null;
@@ -118,7 +112,7 @@
                             city_id: CurrentCity.id,
                         },
                     });
-                    L.marker(TempMarker.getLatLng()).addTo(map)
+                    markers.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(BusStopName));
                     TempMarker.remove();
                     TempMarker = null;
                     ActionOnClick = "";
@@ -144,13 +138,42 @@
         }
     });
 
-    $("#ChoiceCity").click(function () {
-        let CityID = $(this).val()
+    function CancelAddBS() {
+        if (TempMarker) {
+            TempMarker.remove();
+        }
+        TempMarker = null;
+        ActionOnClick = "";
+        $("#BusStopAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $("#BusStopAdd").text('+');
+    }
+
+    function ChoiceCity(id) {
+        let CityID = id
         let City = citys.find(el => el.id == CityID)
-        CurrentCity = City
-        $("#dropdownMenuButton").text(City.name)
-        map.setView([City.latitude, City.longitude], 13);
-    });
+        if (CurrentCity !== City) {
+            CancelAddBS();
+            markers.clearLayers();
+            CurrentCity = City
+            $("#dropdownMenuButton").text(City.name)
+            map.setView([City.latitude, City.longitude]);
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '{% url "PetriNET:ajax_bs_get" %}',
+                method: 'post',
+                dataType: 'html',
+                headers: { 'X-CSRFToken': csrftoken },
+                data: {
+                    city_id: CurrentCity.id,
+                },
+                success: function (data) {
+                    JSON.parse(data).BSList.forEach(BS => {
+                        markers.addLayer(L.marker([BS.latitude, BS.longitude]).bindPopup(BS.name));
+                    });
+                }
+            });
+        }
+    }
 
     map.on('dblclick', (event) => {
         LastClickCord = [event.latlng.lat, event.latlng.lng]
