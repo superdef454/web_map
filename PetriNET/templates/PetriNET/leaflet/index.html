@@ -46,14 +46,13 @@
                 </div>
                 <div class="input-group mb-3">
                     <input type="text" class="form-control" id="BusStopName" placeholder="Название остановки"
-                        aria-label="Имя получателя" aria-describedby="basic-addon2">
+                        aria-label="Название остановки" aria-describedby="basic-addon2">
                     <div class="input-group-append">
                         <button id="BusStopAdd" class="btn btn-primary" type="button">+</button>
                     </div>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 {% endblock %}
@@ -65,15 +64,40 @@
     let TempMarker
     let CurrentCity
 
-    var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 13);
+    var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
     L.control.attribution({ prefix: 'Маршрутно-транспортные сети' }).addTo(map);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-    }).addTo(map);
 
-    var markers = L.layerGroup().addTo(map);
+    var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    var lyrEsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+    let BusStops = L.layerGroup().addTo(map);
+    let CitysLayer = L.layerGroup().addTo(map);
+
+    let Maps = {
+        "OpenStreetMap": lyrOSM,
+        "ESRI World Imagery": lyrEsriImagery
+    };
+
+    let hide_view_groups = {
+        "Города": CitysLayer,
+        "Остановки": BusStops,
+    }
+
+    L.control.layers(Maps, hide_view_groups, { collapsed: false }).addTo(map);
 
     let citys = JSON.parse(document.getElementById('citys_json').textContent)
+    citys.forEach(city => {
+        let city_style = {
+            radius: 5,
+            fillOpacity: 0.5,
+            color: 'black',
+        };
+        CitysLayer.addLayer(L.circleMarker([city.latitude, city.longitude], city_style)
+            .bindPopup(`<a href="#" onclick="ChoiceCity(${city.id})">${city.name}</a>`).on('dblclick', (event) => {
+                ChoiceCity(city.id)
+            }));
+    });
 
     function getCookie(name) {
         let cookieValue = null;
@@ -112,7 +136,7 @@
                             city_id: CurrentCity.id,
                         },
                     });
-                    markers.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(BusStopName));
+                    BusStops.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(BusStopName));
                     TempMarker.remove();
                     TempMarker = null;
                     ActionOnClick = "";
@@ -151,12 +175,12 @@
     function ChoiceCity(id) {
         let CityID = id
         let City = citys.find(el => el.id == CityID)
+        map.setView([City.latitude, City.longitude], 12);
         if (CurrentCity !== City) {
             CancelAddBS();
-            markers.clearLayers();
+            BusStops.clearLayers();
             CurrentCity = City
             $("#dropdownMenuButton").text(City.name)
-            map.setView([City.latitude, City.longitude]);
             const csrftoken = getCookie('csrftoken');
             $.ajax({
                 url: '{% url "PetriNET:ajax_bs_get" %}',
@@ -168,7 +192,9 @@
                 },
                 success: function (data) {
                     JSON.parse(data).BSList.forEach(BS => {
-                        markers.addLayer(L.marker([BS.latitude, BS.longitude]).bindPopup(BS.name));
+                        var popupDiv = document.createElement("div");
+                        popupDiv.innerHTML = `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`;
+                        BusStops.addLayer(L.marker([BS.latitude, BS.longitude]).bindPopup(popupDiv));
                     });
                 }
             });

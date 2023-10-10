@@ -43,7 +43,7 @@ def ajax_bs_get(request):
                 })
             return JsonResponse({
                 'error': 0,
-                'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude'))
+                'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude', 'id'))
                 })
     return JsonResponse({})
 
