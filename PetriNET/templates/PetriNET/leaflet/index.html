@@ -105,7 +105,6 @@
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
                 const cookie = cookies[i].trim();
-                // Does this cookie string begin with the name we want?
                 if (cookie.substring(0, name.length + 1) === (name + '=')) {
                     cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
@@ -135,12 +134,29 @@
                             lng: TempMarker.getLatLng().lng,
                             city_id: CurrentCity.id,
                         },
+                        success: function (data) {
+                            if (JSON.parse(data).error == 0) {
+                                BusStops.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(BusStopName));
+                                TempMarker.remove();
+                                TempMarker = null;
+                                ActionOnClick = "";
+                                $("#BusStopName").val('')
+                            }
+                            else {
+                                TempMarker.remove();
+                                TempMarker = null;
+                                ActionOnClick = "";
+                                alert("Ошибка добавления остановки\nОтвет сервера: " + data)
+                            }
+                        },
+                        error: function (jqXHR, exception) {
+                            TempMarker.remove();
+                            TempMarker = null;
+                            ActionOnClick = "";
+                            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                        }
+
                     });
-                    BusStops.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(BusStopName));
-                    TempMarker.remove();
-                    TempMarker = null;
-                    ActionOnClick = "";
-                    $("#BusStopName").val('')
                     return
                 };
                 if (ActionOnClick == 'AddTempMarker') {
@@ -175,6 +191,8 @@
     function ChoiceCity(id) {
         let CityID = id
         let City = citys.find(el => el.id == CityID)
+        let CityCircle = CitysLayer.getLayers().find(layer => layer.getLatLng().lat == City.latitude && layer.getLatLng().lng == City.longitude)
+        CityCircle.closePopup();
         map.setView([City.latitude, City.longitude], 12);
         if (CurrentCity !== City) {
             CancelAddBS();
@@ -207,7 +225,7 @@
             if (TempMarker) {
                 TempMarker.remove()
             }
-            TempMarker = L.marker(LastClickCord, { opacity: 0.5 }).addTo(map).on('click', (event) => {
+            TempMarker = L.marker(LastClickCord, { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
                 TempMarker.remove();
                 TempMarker = null;
                 $("#BusStopAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');

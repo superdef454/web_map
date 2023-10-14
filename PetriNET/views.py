@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 
 from .models import City, BusStop
 
@@ -11,6 +12,7 @@ def main_index(request):
         responce
     )
 
+@login_required
 def ajax_bs_add(request):
     if request.method == "POST":
         if request.user.is_superuser:
@@ -30,8 +32,11 @@ def ajax_bs_add(request):
                 longitude=lng
             )
             return JsonResponse({'error': 0})
-    return JsonResponse({})
+        else:
+            return JsonResponse({'error': 2, 'error_message': 'Ошибка прав доступа'})
+    return JsonResponse({'error': 1})
 
+@login_required
 def ajax_bs_get(request):
     if request.method == "POST":
         if request.user.is_authenticated:
@@ -41,12 +46,16 @@ def ajax_bs_get(request):
                     'error': 1,
                     'error_messgae': 'Ошибка заполнения данных'
                 })
-            return JsonResponse({
+            response = {
                 'error': 0,
-                'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude', 'id'))
-                })
+            }
+            response.update(
+                {'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude', 'id'))}
+            )
+            return JsonResponse(response)
     return JsonResponse({})
 
+@login_required
 def leaflet(request):
     responce = {}
     responce['citys'] = list(City.objects.values('name', 'latitude', 'longitude', 'id'))
