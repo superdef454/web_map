@@ -65,7 +65,8 @@
                     <div class="card-body text-center">
                         <div class="input-group mb-3">
                             <div class="btn-group">
-                                <button class="btn btn-primary" id="RouteAll" type="button">Показать все</button>
+                                <button class="btn btn-primary" id="RouteAll" type="button"
+                                    onclick="ShowAllRoutes()">Показать все</button>
                                 <button class="btn btn-primary" id="RouteOne" type="button">Выбрать один</button>
                             </div>
                             <div class="input-group-append">
@@ -83,9 +84,9 @@
 {% block endjs %}
 <script>
     let ActionOnClick = ""
-    let LastClickCord = []
     let TempMarker
     let TempRoute
+    let TempRouteList = []
     let CurrentCity
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
@@ -162,16 +163,16 @@
                         },
                         success: function (data) {
                             if (JSON.parse(data).error == 0) {
-                                BusStops.addLayer(L.marker(TempMarker.getLatLng()).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/busstop/${JSON.parse(data).BusStop.id}/change/"><p>${BusStopName}</p></a>`).on('click', ClickOnBS));
-                                CancelAddBS();
+                                CreateBS(TempMarker.getLatLng(), `<a href="{% url 'admin:index' %}PetriNET/busstop/${JSON.parse(data).BusStop.id}/change/"><p>${BusStopName}</p></a>`);
+                                CloseAllAction();
                             }
                             else {
-                                CancelAddBS();
+                                CloseAllAction();
                                 alert("Ошибка добавления остановки\nОтвет сервера: " + data)
                             }
                         },
                         error: function (jqXHR, exception) {
-                            CancelAddBS();
+                            CloseAllAction();
                             alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
                         }
                     });
@@ -195,19 +196,43 @@
     });
 
     function ClickOnBS(BS) {
+        latlng = [BS.latlng.lat, BS.latlng.lng]
         if (ActionOnClick == 'AddTempRoute') {
-            if (TempRoute) {
-                TempMarker.remove()
+            BS.target.closePopup();
+            let include = -1
+            TempRouteList.forEach((value, i) => {
+                if (value[0] == latlng[0] && value[1] == latlng[1]) {
+                    include = i
+                }
+            })
+            if (include >= 0) {
+                TempRouteList.splice(include, 1);
             }
             else {
+                TempRouteList.push(latlng)
+            }
+            if (TempRouteList.length <= 1) {
                 $("#RouteAdd").attr('style', 'background-color: #dc3545; border-color: #dc3545;');
                 $("#RouteAdd").text('x');
+                if (TempRoute) {
+                    TempRoute.remove()
+                    TempRoute = null;
+                }
             }
-            // TempMarker = L.marker(LastClickCord, { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
-            //     CloseAllAction();
-            // })
-            // $("#BusStopAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
-            // $("#BusStopAdd").text('✓');
+            if (TempRoute && TempRouteList.length <= 1) {
+                TempRoute.remove()
+                TempRoute = null;
+            }
+            if (TempRoute && TempRouteList.length > 1) {
+                TempRoute.setLatLngs(TempRouteList);
+            }
+            if (TempRouteList.length > 1 && (typeof TempRoute == "undefined" || TempRoute == null)) {
+                TempRoute = L.polyline(TempRouteList, { color: '#' + Math.floor(Math.random() * 16777215).toString(16) }).addTo(map);
+            }
+            if (TempRouteList.length > 1) {
+                $("#RouteAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
+                $("#RouteAdd").text('✓');
+            }
         }
     }
 
@@ -218,6 +243,10 @@
             if (ActionOnClick == 'AddTempRoute' && typeof TempRoute !== "undefined" && TempRoute !== null) {
                 $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
                 $(this).text('+');
+                // Отправить на сервер
+                RouteLayer.addLayer(TempRoute);
+                TempRoute = null
+                CloseAllAction();
                 return
             };
             if (ActionOnClick == 'AddTempRoute') {
@@ -233,29 +262,31 @@
         }
     });
 
-    $('#RouteAll').click(function () {
+    function ShowAllRoutes() {
         if (CurrentCity) {
         }
         else {
             console.log('Выберите город');
         }
-    });
-
-    $("#RouteOne").click(function () {
-        if (CurrentCity) {
-        }
-        else {
-            console.log('Выберите город');
-        }
-    });
-
-
-    function CloseAllAction() {
-        CancelAddBS();
-        CancelAddRoute();
     }
 
-    function CancelAddBS() {
+    function CreateBS(latlng, popup) {
+        BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
+    }
+
+    // function CreateRoute(latlngList, popup) {
+        // return L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS)
+    // }
+
+    function CloseAllAction() {
+        if (TempRoute) {
+            TempRoute.remove();
+        }
+        TempRoute = null;
+        TempRouteList = [];
+        ActionOnClick = "";
+        $("#RouteAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $("#RouteAdd").text('+');
         if (TempMarker) {
             TempMarker.remove();
         }
@@ -264,16 +295,6 @@
         $("#BusStopName").val('');
         $("#BusStopAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
         $("#BusStopAdd").text('+');
-    }
-
-    function CancelAddRoute() {
-        if (TempRoute) {
-            TempRoute.remove();
-        }
-        TempRoute = null;
-        ActionOnClick = "";
-        $("#RouteAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
-        $("#RouteAdd").text('+');
     }
 
     function ChoiceCity(id) {
@@ -299,9 +320,7 @@
                 },
                 success: function (data) {
                     JSON.parse(data).BSList.forEach(BS => {
-                        var popupDiv = document.createElement("div");
-                        popupDiv.innerHTML = `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`;
-                        BusStops.addLayer(L.marker([BS.latitude, BS.longitude]).bindPopup(popupDiv).on('click', ClickOnBS));
+                        CreateBS([BS.latitude, BS.longitude], `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`);
                     });
                 }
             });
@@ -309,12 +328,11 @@
     }
 
     map.on('dblclick', (event) => {
-        LastClickCord = [event.latlng.lat, event.latlng.lng]
         if (ActionOnClick == 'AddTempMarker') {
             if (TempMarker) {
                 TempMarker.remove()
             }
-            TempMarker = L.marker(LastClickCord, { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
+            TempMarker = L.marker([event.latlng.lat, event.latlng.lng], { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
                 CloseAllAction();
             })
             $("#BusStopAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
