@@ -26,6 +26,7 @@ class TC(models.Model):
 
 
 class BusStop(models.Model):
+    # Быть может one-to-one field к остановке напротив
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название остановки", max_length=250)
     latitude = models.FloatField(verbose_name="Широта")

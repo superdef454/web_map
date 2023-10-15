@@ -25,13 +25,13 @@ def ajax_bs_add(request):
                     'error': 1,
                     'error_messgae': 'Ошибка заполнения данных'
                 })
-            BusStop.objects.create(
+            add = BusStop.objects.create(
                 city=City.objects.get(id=city_id),
                 name=name,
                 latitude=lat,
                 longitude=lng
             )
-            return JsonResponse({'error': 0})
+            return JsonResponse({'error': 0, 'BusStop': {'id': add.id}})
         else:
             return JsonResponse({'error': 2, 'error_message': 'Ошибка прав доступа'})
     return JsonResponse({'error': 1})
