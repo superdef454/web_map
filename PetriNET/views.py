@@ -38,25 +38,6 @@ def ajax_bs_add(request):
     return JsonResponse({'error': 1})
 
 @login_required
-def ajax_bs_get(request):
-    if request.method == "POST":
-        if request.user.is_authenticated:
-            city_id = request.POST.get('city_id')
-            if not city_id:
-                return JsonResponse({
-                    'error': 1,
-                    'error_messgae': 'Ошибка заполнения данных'
-                })
-            response = {
-                'error': 0,
-            }
-            response.update(
-                {'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude', 'id'))}
-            )
-            return JsonResponse(response)
-    return JsonResponse({})
-
-@login_required
 def ajax_route_add(request):
     if request.method == "POST":
         if request.user.is_superuser:
@@ -69,7 +50,7 @@ def ajax_route_add(request):
                     'error_messgae': 'Ошибка заполнения данных'
                 })
             try:
-                list_bs_id = [BusStop.objects.get(latitude = bs[0], longitude = bs[1]) for bs in list_coord]
+                list_bs = [BusStop.objects.get(latitude = bs[0], longitude = bs[1]) for bs in list_coord]
             except:
                 return JsonResponse({
                     'error': 1,
@@ -79,36 +60,39 @@ def ajax_route_add(request):
                 city=City.objects.get(id=city_id),
                 name=name,
             )
-            print(list_bs_id)
-            # add = Route.objects.create(
-            #     city=City.objects.get(id=city_id),
-            #     name=name,
-            #     latitude=lat,
-            #     longitude=lng
-            # )
-            return JsonResponse({'error': 0, 'BusStop': {'id': 'test'}})
+            add.busstop.add(*list_bs)
+            add.list_coord = list_coord
+            add.save()
+            return JsonResponse({'error': 0, 'Route': {'id': add.id, 'name': add.name}})
         else:
             return JsonResponse({'error': 2, 'error_message': 'Ошибка прав доступа'})
     return JsonResponse({'error': 1})
 
 @login_required
-def ajax_route_get(request):
+def ajax_city_data_get(request):
     if request.method == "POST":
         if request.user.is_authenticated:
-            pass
-            # city_id = request.POST.get('city_id')
-            # if not city_id:
-            #     return JsonResponse({
-            #         'error': 1,
-            #         'error_messgae': 'Ошибка заполнения данных'
-            #     })
-            # response = {
-            #     'error': 0,
-            # }
-            # response.update(
-            #     {'BSList': list(BusStop.objects.filter(city=City.objects.get(id=city_id)).values('name', 'latitude', 'longitude', 'id'))}
-            # )
-            # return JsonResponse(response)
+            city_id = request.POST.get('city_id')
+            if not city_id:
+                return JsonResponse({
+                    'error': 1,
+                    'error_messgae': 'Ошибка заполнения данных'
+                })
+            city = City.objects.get(id=city_id)
+            response = {'error': 0}
+            BSList = list(BusStop.objects.filter(city=city).values('name', 'latitude', 'longitude', 'id'))
+            RouteList = [{
+                'name': route.name,
+                'list_coord': route.list_coord,
+                'id': route.id
+                } for route in Route.objects.filter(city=city)]
+            response.update(
+                {
+                    'BSList': BSList,
+                    'RouteList': RouteList
+                }
+            )
+            return JsonResponse(response)
     return JsonResponse({})
 
 @login_required

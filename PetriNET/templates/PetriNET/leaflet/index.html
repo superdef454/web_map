@@ -243,7 +243,6 @@
             if (ActionOnClick == 'AddTempRoute' && typeof TempRoute !== "undefined" && TempRoute !== null) {
                 $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
                 $(this).text('+');
-                // Отправить на сервер
                 const csrftoken = getCookie('csrftoken');
                     $.ajax({
                         url: '{% url "PetriNET:ajax_route_add" %}',
@@ -252,12 +251,13 @@
                         headers: { 'X-CSRFToken': csrftoken },
                         data: {
                             list_coord: JSON.stringify(TempRouteList),
-                            name: "Test name",
+                            name: "Изменить название маршрута",
                             city_id: CurrentCity.id,
                         },
                         success: function (data) {
                             if (JSON.parse(data).error == 0) {
-                                CreateRoute(TempRoute)
+                                CreateRoute(TempRoute, `<a href="{% url 'admin:index' %}PetriNET/route/${JSON.parse(data).Route.id}/change/"><p>${JSON.parse(data).Route.name}</p></a>`)
+                                TempRoute = null;
                                 CloseAllAction();
                             }
                             else {
@@ -296,13 +296,9 @@
         BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
     }
 
-    function CreateRoute(Route) {
-        RouteLayer.addLayer(Route);
+    function CreateRoute(Route, popup) {
+        RouteLayer.addLayer(Route.bindPopup(popup));
     }
-
-    // function CreateRoute(latlngList, popup) {
-        // return L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS)
-    // }
 
     function CloseAllAction() {
         if (TempRoute) {
@@ -332,12 +328,13 @@
         if (CurrentCity !== City) {
             CloseAllAction();
             BusStops.clearLayers();
+            RouteLayer.clearLayers();
             CurrentCity = City;
             $("#RouteAll").click();
             $("#dropdownMenuButton").text(City.name);
             const csrftoken = getCookie('csrftoken');
             $.ajax({
-                url: '{% url "PetriNET:ajax_bs_get" %}',
+                url: '{% url "PetriNET:ajax_city_data_get" %}',
                 method: 'post',
                 dataType: 'html',
                 headers: { 'X-CSRFToken': csrftoken },
@@ -347,6 +344,10 @@
                 success: function (data) {
                     JSON.parse(data).BSList.forEach(BS => {
                         CreateBS([BS.latitude, BS.longitude], `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`);
+                    });
+                    JSON.parse(data).RouteList.forEach(Route => {
+                        CreateRoute(L.polyline(Route.list_coord, { color: '#' + Math.floor(Math.random() * 16777215).toString(16) }),
+                        `<a href="{% url 'admin:index' %}PetriNET/route/${Route.id}/change/"><p>${Route.name}</p></a>`)
                     });
                 }
             });

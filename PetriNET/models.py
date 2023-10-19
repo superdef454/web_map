@@ -18,7 +18,10 @@ class TC(models.Model):
     name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250)
     # TODO Добавить поле изображения для визализации что это за транспорт
     capacity = models.SmallIntegerField(verbose_name="Вместимость")
-    description = models.TextField(verbose_name="Описание")
+    description = models.TextField(verbose_name="Описание", null=True)
+    
+    def __str__(self):
+        return self.name
     
     class Meta:
         verbose_name = 'Тип транспортного средства'
@@ -44,8 +47,10 @@ class Route(models.Model):
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название маршрута", max_length=250)
     tc = models.ForeignKey(TC, verbose_name="Тип транспортного средства", on_delete=models.SET_NULL, null=True)
-    interval = models.SmallIntegerField(verbose_name="Интервал движения")
-    amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте")
+    interval = models.SmallIntegerField(verbose_name="Интервал движения", null=True)
+    amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
+    list_coord = models.JSONField('Порядок остановок', null=True)
+    busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
 
     def __str__(self):
         return self.name
