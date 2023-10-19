@@ -168,7 +168,7 @@
                             }
                             else {
                                 CloseAllAction();
-                                alert("Ошибка добавления остановки\nОтвет сервера: " + data)
+                                alert("Ошибка добавления остановки\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
                             }
                         },
                         error: function (jqXHR, exception) {
@@ -244,9 +244,31 @@
                 $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
                 $(this).text('+');
                 // Отправить на сервер
-                RouteLayer.addLayer(TempRoute);
-                TempRoute = null
-                CloseAllAction();
+                const csrftoken = getCookie('csrftoken');
+                    $.ajax({
+                        url: '{% url "PetriNET:ajax_route_add" %}',
+                        method: 'post',
+                        dataType: 'html',
+                        headers: { 'X-CSRFToken': csrftoken },
+                        data: {
+                            list_coord: JSON.stringify(TempRouteList),
+                            name: "Test name",
+                            city_id: CurrentCity.id,
+                        },
+                        success: function (data) {
+                            if (JSON.parse(data).error == 0) {
+                                CreateRoute(TempRoute)
+                                CloseAllAction();
+                            }
+                            else {
+                                CloseAllAction();
+                                alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
+                            }
+                        },
+                        error: function (jqXHR, exception) {
+                            CloseAllAction();
+                            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                        }})
                 return
             };
             if (ActionOnClick == 'AddTempRoute') {
@@ -272,6 +294,10 @@
 
     function CreateBS(latlng, popup) {
         BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
+    }
+
+    function CreateRoute(Route) {
+        RouteLayer.addLayer(Route);
     }
 
     // function CreateRoute(latlngList, popup) {
