@@ -63,7 +63,11 @@ def ajax_route_add(request):
             add.busstop.add(*list_bs)
             add.list_coord = list_coord
             add.save()
-            return JsonResponse({'error': 0, 'Route': {'id': add.id, 'name': add.name}})
+            return JsonResponse({'error': 0, 'Route': {
+                'name': add.name,
+                'list_coord': add.list_coord,
+                'id': add.id
+                }})
         else:
             return JsonResponse({'error': 2, 'error_message': 'Ошибка прав доступа'})
     return JsonResponse({'error': 1})
@@ -86,6 +90,7 @@ def ajax_city_data_get(request):
                 'list_coord': route.list_coord,
                 'id': route.id
                 } for route in Route.objects.filter(city=city)]
+            RouteList.sort(key=lambda route: len(route['list_coord']), reverse=True)
             response.update(
                 {
                     'BSList': BSList,
@@ -94,6 +99,8 @@ def ajax_city_data_get(request):
             )
             return JsonResponse(response)
     return JsonResponse({})
+
+# Можно найти растояние между двумя остановками с помощью geopy.distance
 
 @login_required
 def leaflet(request):

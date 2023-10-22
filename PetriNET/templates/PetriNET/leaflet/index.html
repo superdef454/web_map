@@ -79,6 +79,24 @@
         </div>
     </div>
 </div>
+
+<!-- Модальное окно -->
+<div class="modal fade" id="ChoiceRoute" tabindex="-1" aria-labelledby="ChoiceRouteTitle" style="display: none;"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ChoiceRouteTitle">Выберите маршрут</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body">
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block endjs %}
@@ -88,31 +106,33 @@
     let TempRoute
     let TempRouteList = []
     let CurrentCity
+    let Routes = []
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
     L.control.attribution({ prefix: 'Маршрутно-транспортные сети' }).addTo(map);
 
+    // Карты
     var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
     var lyrEsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 
+    // Поверхности объектов
     let BusStops = L.layerGroup().addTo(map);
     let CitysLayer = L.layerGroup().addTo(map);
     let RouteLayer = L.layerGroup().addTo(map);
 
+    // Настройки карты в правом окне
     let Maps = {
         "OpenStreetMap": lyrOSM,
         "ESRI World Imagery": lyrEsriImagery
     };
-
     let hide_view_groups = {
         "Города": CitysLayer,
         "Остановки": BusStops,
         "Маршруты": RouteLayer,
     }
-
     L.control.layers(Maps, hide_view_groups, { collapsed: false }).addTo(map);
 
+    // Разбор данных городов
     let citys = JSON.parse(document.getElementById('citys_json').textContent)
     citys.forEach(city => {
         let city_style = {
@@ -126,6 +146,7 @@
             }));
     });
 
+    // Получение ключа сервера
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -141,6 +162,7 @@
         return cookieValue;
     }
 
+    // Кнопка добавления остановки
     $("#BusStopAdd").click(function () {
         $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
         if (CurrentCity) {
@@ -227,7 +249,11 @@
                 TempRoute.setLatLngs(TempRouteList);
             }
             if (TempRouteList.length > 1 && (typeof TempRoute == "undefined" || TempRoute == null)) {
-                TempRoute = L.polyline(TempRouteList, { color: '#' + Math.floor(Math.random() * 16777215).toString(16) }).addTo(map);
+                TempRoute = L.polyline(TempRouteList, {
+                    color: arrayRandElement(ListColour),
+                    weight: 6,
+                    fillOpacity: 0.2,
+                }).addTo(map);
             }
             if (TempRouteList.length > 1) {
                 $("#RouteAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
@@ -236,7 +262,7 @@
         }
     }
 
-
+    // Кнопка добавления маршрута
     $("#RouteAdd").click(function () {
         $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
         if (CurrentCity) {
@@ -244,37 +270,37 @@
                 $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
                 $(this).text('+');
                 const csrftoken = getCookie('csrftoken');
-                    $.ajax({
-                        url: '{% url "PetriNET:ajax_route_add" %}',
-                        method: 'post',
-                        dataType: 'html',
-                        headers: { 'X-CSRFToken': csrftoken },
-                        data: {
-                            list_coord: JSON.stringify(TempRouteList),
-                            name: "Изменить название маршрута",
-                            city_id: CurrentCity.id,
-                        },
-                        success: function (data) {
-                            if (JSON.parse(data).error == 0) {
-                                CreateRoute(TempRoute, `<a href="{% url 'admin:index' %}PetriNET/route/${JSON.parse(data).Route.id}/change/"><p>${JSON.parse(data).Route.name}</p></a>`)
-                                TempRoute = null;
-                                CloseAllAction();
-                            }
-                            else {
-                                CloseAllAction();
-                                alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
-                            }
-                        },
-                        error: function (jqXHR, exception) {
-                            CloseAllAction();
-                            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
-                        }})
+                $.ajax({
+                    url: '{% url "PetriNET:ajax_route_add" %}',
+                    method: 'post',
+                    dataType: 'html',
+                    headers: { 'X-CSRFToken': csrftoken },
+                    data: {
+                        list_coord: JSON.stringify(TempRouteList),
+                        name: "Изменить название маршрута",
+                        city_id: CurrentCity.id,
+                    },
+                    success: function (data) {
+                        if (JSON.parse(data).error == 0) {
+                            CreateRoute(JSON.parse(data).Route.list_coord, JSON.parse(data).Route.id, JSON.parse(data).Route.name)
+                            $("#RouteAll").click();
+                        }
+                        else {
+                            alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
+                        }
+                    },
+                    error: function (jqXHR, exception) {
+                        alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                    }
+                })
+                CloseAllAction();
                 return
             };
             if (ActionOnClick == 'AddTempRoute') {
                 CloseAllAction();
                 return
             }
+            RouteLayer.clearLayers();
             $(this).attr('style', 'background-color: #dc3545; border-color: #dc3545;');
             $(this).text('x');
             ActionOnClick = 'AddTempRoute'
@@ -286,18 +312,81 @@
 
     function ShowAllRoutes() {
         if (CurrentCity) {
+            RouteLayer.clearLayers();
+            Routes.forEach(route => {
+                DrawRoute(route)
+            })
         }
         else {
-            console.log('Выберите город');
+            alert('Выберите город');
         }
     }
 
+    // Отображение модального окна выбора маршрута
+    $("#RouteOne").click(function () {
+        if (CurrentCity) {
+            let modal = $("#ChoiceRoute")
+            let body = modal.find(".modal-body")
+            if (Routes.length > 0) {
+                body.html(`
+            <div class="d-flex justify-content-center flex-wrap bd-highlight">
+            `)
+                Routes.forEach((route, index) => {
+                    body.append(`<div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="ChoiceOneRoute(${route.id})">${index + 1}: ${route.name}</div>`)// <button type="button" class="btn btn-primary" onclick="ChoiceOneRoute(${route.id})">${route.name}</button></div>`)
+                })
+                body.append(`
+            </div>
+            `)
+            }
+            else {
+                body.html('<p>Маршрутов нет</p>')
+            }
+            modal.modal('show')
+        }
+        else {
+            alert('Выберите город');
+        }
+    })
+
+    // Отображение одного маршрута
+    function ChoiceOneRoute(id) {
+        if (CurrentCity) {
+            route = Routes.find(route => route.id == id)
+            if (route) {
+                RouteLayer.clearLayers();
+                DrawRoute(route);
+                $("#ChoiceRoute").modal('hide');
+            }
+            else {
+                alert("Маршрут не найден!")
+            }
+        }
+        else {
+            alert('Выберите город');
+        }
+    }
+
+    // Добавление остановки в группу остановок на карту
     function CreateBS(latlng, popup) {
         BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
     }
 
-    function CreateRoute(Route, popup) {
-        RouteLayer.addLayer(Route.bindPopup(popup));
+    // Добавление маршрута в список
+    function CreateRoute(list_coord, id, name) {
+        Routes.push({
+            "list_coord": list_coord,
+            "id": id,
+            "name": name
+        })
+    }
+
+    // Добавление маршрутов в группу маршрутов на карту
+    function DrawRoute(route) {
+        RouteLayer.addLayer(L.polyline(route.list_coord, {
+            color: arrayRandElement(ListColour),
+            weight: 6,
+            fillOpacity: 0.2,
+        }).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/route/${route.id}/change/"><p>${route.name}</p></a>`));
     }
 
     function CloseAllAction() {
@@ -329,8 +418,8 @@
             CloseAllAction();
             BusStops.clearLayers();
             RouteLayer.clearLayers();
+            Routes = [];
             CurrentCity = City;
-            $("#RouteAll").click();
             $("#dropdownMenuButton").text(City.name);
             const csrftoken = getCookie('csrftoken');
             $.ajax({
@@ -346,9 +435,9 @@
                         CreateBS([BS.latitude, BS.longitude], `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`);
                     });
                     JSON.parse(data).RouteList.forEach(Route => {
-                        CreateRoute(L.polyline(Route.list_coord, { color: '#' + Math.floor(Math.random() * 16777215).toString(16) }),
-                        `<a href="{% url 'admin:index' %}PetriNET/route/${Route.id}/change/"><p>${Route.name}</p></a>`)
+                        CreateRoute(Route.list_coord, Route.id, Route.name)
                     });
+                    $("#RouteAll").click();
                 }
             });
         }
@@ -366,5 +455,13 @@
             $("#BusStopAdd").text('✓');
         }
     })
+
+    ListColour = [
+        "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"
+    ]
+    function arrayRandElement(arr) {
+        var rand = Math.floor(Math.random() * arr.length);
+        return arr[rand];
+    }
 </script>
 {% endblock %}
