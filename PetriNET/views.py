@@ -5,13 +5,6 @@ from django.contrib.auth.decorators import login_required
 
 from .models import City, BusStop, Route
 
-def main_index(request):
-    responce = {}
-    return render(
-        request,
-        'PetriNET/index.html',
-        responce
-    )
 
 @login_required
 def ajax_bs_add(request):
@@ -89,7 +82,7 @@ def ajax_city_data_get(request):
                 'name': route.name,
                 'list_coord': route.list_coord,
                 'id': route.id
-                } for route in Route.objects.filter(city=city)]
+                } for route in Route.objects.filter(city=city)] # Если len(route.list_coord) < route.busstop.all().count() удалить маршрут и вызвать ошибку
             RouteList.sort(key=lambda route: len(route['list_coord']), reverse=True)
             response.update(
                 {
@@ -101,6 +94,43 @@ def ajax_city_data_get(request):
     return JsonResponse({})
 
 # Можно найти растояние между двумя остановками с помощью geopy.distance
+
+# Функция проверки заполненной сети
+@login_required
+def load_calculation(request):
+    if request.method == "POST":
+        if request.user.is_authenticated:
+            city_id = request.POST.get('city_id')
+            try:
+                petri_data = json.loads(request.POST.get('petri_data'))
+            except Exception:
+                return JsonResponse({
+                    'error': 1,
+                    'error_messgae': 'Ошибка заполнения данных'
+                })                
+            if not city_id or not petri_data:
+                return JsonResponse({
+                    'error': 1,
+                    'error_messgae': 'Ошибка заполнения данных'
+                })
+            print(petri_data)
+            # city = City.objects.get(id=city_id)
+            response = {'error': 0}
+            # BSList = list(BusStop.objects.filter(city=city).values('name', 'latitude', 'longitude', 'id'))
+            # RouteList = [{
+            #     'name': route.name,
+            #     'list_coord': route.list_coord,
+            #     'id': route.id
+            #     } for route in Route.objects.filter(city=city)] # Если len(route.list_coord) < route.busstop.all().count() удалить маршрут и вызвать ошибку
+            # RouteList.sort(key=lambda route: len(route['list_coord']), reverse=True)
+            # response.update(
+            #     {
+            #         'BSList': BSList,
+            #         'RouteList': RouteList
+            #     }
+            # )
+            return JsonResponse(response)
+    return JsonResponse({})
 
 @login_required
 def leaflet(request):

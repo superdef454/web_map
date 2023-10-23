@@ -75,12 +75,29 @@
                         </div>
                     </div>
                 </div>
+                <div class="card bg-transparent border-primary w-100 mb-3">
+                    <div class="card-header bg-light">
+                        Расчёт нагрузки
+                    </div>
+                    <div class="card-body text-center">
+                        <input id="FilePetri" type="file" style="display: none;"
+                            onchange="PetriFileProcess(this.files)" />
+                        <button class="btn btn-primary mb-3 btn-block" id="FilePetriButton" type="button">Из <a
+                                href="{% static 'petri_example.json' %}" title="Скачать пример файла" download=""
+                                class="text-white">файла</a></button>
+                        <div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="">Выбрать маршруты
+                        </div>
+                        <div type="button" class="btn btn-danger bd-highlight mb-3 mr-3" onclick="">Сброс</div>
+                        <div type="button" class="btn btn-success bd-highlight mb-3 mr-3 btn-block" onclick="">Расчёт
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно -->
+<!-- Модальное окно отображения одного маршрута-->
 <div class="modal fade" id="ChoiceRoute" tabindex="-1" aria-labelledby="ChoiceRouteTitle" style="display: none;"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
@@ -92,6 +109,22 @@
                 </button>
             </div>
             <div class="modal-body">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно отображения результатов расчёта-->
+<div class="modal fade" id="AnalysisOfCalculationResults" tabindex="-1"
+    aria-labelledby="AnalysisOfCalculationResultsTitle" style="display: none;" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <button class="btn btn-primary" type="button">Показать отчёт</button>
+                <button class="btn btn-primary" type="button">Имитировать работу онлайн</button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
             </div>
         </div>
     </div>
@@ -109,7 +142,7 @@
     let Routes = []
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
-    L.control.attribution({ prefix: 'Маршрутно-транспортные сети' }).addTo(map);
+    L.control.attribution({ prefix: 'Маршрутно-транспортные сети | <a href="{% url "admin:index" %}">Админ панель</a>' }).addTo(map);
 
     // Карты
     var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -455,6 +488,52 @@
             $("#BusStopAdd").text('✓');
         }
     })
+
+    $('#FilePetriButton').on('click', function () {
+        if (CurrentCity) {
+            $('#FilePetri').trigger('click');
+        }
+        else {
+            alert('Выберите город');
+        }
+    });
+
+    function PetriFileProcess(files) {
+        if (files.length > 0) {
+            let file = files[0];
+            if (file.type == 'application/json') {
+                let reader = new FileReader();
+                reader.onload = function (e) {
+                    const csrftoken = getCookie('csrftoken');
+                    let petri_data = e.target.result
+                    $.ajax({
+                        url: '{% url "PetriNET:load_calculation" %}',
+                        method: 'post',
+                        dataType: 'html',
+                        headers: { 'X-CSRFToken': csrftoken },
+                        data: {
+                            city_id: CurrentCity.id,
+                            petri_data: petri_data
+                        },
+                        success: function (data) {
+                            responce = JSON.parse(data)
+                            if (responce.error == 0) {
+                                let modal = $("#AnalysisOfCalculationResults");
+                                modal.modal('show')
+                            }
+                            else {
+                                alert("Ошибка расчёта\nОтвет сервера: " + responce.error + ' ' + responce.error_messgae)
+                            }
+                        },
+                        error: function (jqXHR, exception) {
+                            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                        }
+                    });
+                };
+                reader.readAsText(file);
+            }
+        }
+    }
 
     ListColour = [
         "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"

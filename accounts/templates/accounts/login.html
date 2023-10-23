@@ -2,6 +2,6 @@
 {% load static %}
 
 {% block body %}
-    Вход
+    Вход <a href="{% url 'accounts:register' %}">Зарегистрироваться</a>
     {% include 'inc_form.html' with form=form %}
 {% endblock %}
