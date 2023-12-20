@@ -30,6 +30,52 @@ def ajax_bs_add(request):
             return JsonResponse({'error': 2, 'error_message': 'Ошибка прав доступа'})
     return JsonResponse({'error': 1})
 
+# {
+#     "routs":[1,2,3],
+#     "busstops":[
+#         {
+#             "busstop_id":1,  # С 1 ОП
+#             "passengers":{
+#                 3:5,  # 5 человек поедут на 3 ОП
+#                 4:3,  # 3 человека поедут на 4 ОП
+#                 7:2,  # 2 человека поедут на 7 ОП
+#                 0:12  # 12 человек поедут рандомно
+#             }
+#         }
+#     ]
+# }
+
+# actions = [
+#     [
+#         {
+#             "route_id":3,
+#             "latlng":[1.1234,2.3213],
+#             "capacity":130,
+#             "passengers":65,
+#         },
+#         {
+#             "route_id":2,
+#             "latlng":[1.1334,2.3313],
+#             "capacity":70,
+#             "passengers":43,
+#         }
+#     ],
+#         [
+#         {
+#             "route_id":3,
+#             "latlng":[1.2234,2.4213],
+#             "capacity":130,
+#             "passengers":57,
+#         },
+#         {
+#             "route_id":2,
+#             "latlng":[1.2334,2.4313],
+#             "capacity":70,
+#             "passengers":40,
+#         }
+#     ]
+# ]
+
 @login_required
 def ajax_route_add(request):
     if request.method == "POST":

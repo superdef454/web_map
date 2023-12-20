@@ -1,10 +1,20 @@
 from django.db import models
+from django.forms import ValidationError
+from django.core.validators import MaxValueValidator
+
+def validate_latitude(value):
+    if not (-90 <= value <= 90):
+        raise ValidationError('Широта должна быть в пределах от -90 до 90.')
+
+def validate_longitude(value):
+    if not (-180 <= value <= 180):
+        raise ValidationError('Долгота должна быть в пределах от -180 до 180.')
 
 class City(models.Model):
-    region = models.SmallIntegerField(verbose_name="Регион")
+    region = models.SmallIntegerField(verbose_name="Регион", validators=[MaxValueValidator(1000)])
     name = models.CharField(verbose_name="Название города", max_length=250)
-    latitude = models.FloatField(verbose_name="Широта")
-    longitude = models.FloatField(verbose_name="Долгота")
+    latitude = models.FloatField(verbose_name="Широта", validators=[validate_latitude])
+    longitude = models.FloatField(verbose_name="Долгота", validators=[validate_longitude])
 
     def __str__(self):
         return self.name
@@ -32,8 +42,8 @@ class BusStop(models.Model):
     # Быть может one-to-one field к остановке напротив
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название остановки", max_length=250)
-    latitude = models.FloatField(verbose_name="Широта")
-    longitude = models.FloatField(verbose_name="Долгота")
+    latitude = models.FloatField(verbose_name="Широта", validators=[validate_latitude])
+    longitude = models.FloatField(verbose_name="Долгота", validators=[validate_longitude])
     
     def __str__(self):
         return self.name
@@ -58,5 +68,18 @@ class Route(models.Model):
     class Meta:
         verbose_name = 'Маршрут'
         verbose_name_plural = 'Маршруты'
+
+
+class EI(models.Model):
+    name = models.CharField(verbose_name="Название единицы измерения", max_length=250)
+    short_name = models.CharField(verbose_name="Краткое название", max_length=15)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        verbose_name = 'Единица измерения'
+        verbose_name_plural = 'Единицы измерения'
     
 # Simulation
+# Скачать файл расчёта после формирования в окне отчёта

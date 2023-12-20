@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 
-from .models import City, BusStop, Route, TC
+from .models import City, BusStop, Route, TC, EI
 
 
 @admin.register(Route)
@@ -14,7 +14,6 @@ class ClassAdmin(admin.ModelAdmin):
 
 @admin.register(BusStop)
 class ClassAdmin(admin.ModelAdmin):
-    fields = ['city', 'name']
     list_filter = ('city',)
     search_fields = ('name',)
     list_display = ('name', 'city')
@@ -22,3 +21,4 @@ class ClassAdmin(admin.ModelAdmin):
 
 admin.site.register(City)
 admin.site.register(TC)
+admin.site.register(EI)
