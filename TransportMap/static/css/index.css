@@ -4,13 +4,12 @@
     position: relative;
 }
 
-.left-panel{
+#left-panel{
     width: 350px;
-    height: 98%;            
     position: absolute;
-    top: 0;
+    top: 50%;
     left: 0;
+    transform: translate(0, -50%);
     z-index: 900;
     margin: 10px 0 20px 55px;
-    align-items: center;
 }
