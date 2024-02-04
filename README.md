@@ -12,7 +12,7 @@
 
 ### Экранные формы программного средства представлены ниже
 
->**Основное окно авторизированного пользователя**
+>**Основное окно авторизованного пользователя**
 >![Карта](info/scrin1.png)
 >**Модальное окно выбора маршрута**
 >*Данные получены по средствам ajax запросов*
@@ -25,7 +25,7 @@
 ### Инструкция развёртывания
 
 python 3.10.6
-все зависимости находяться в файле req.txt
+все зависимости находятся в файле req.txt
 
 **Установка:**
 
@@ -39,21 +39,23 @@ python 3.10.6
 
 *Результат:*
 
-><span style="color:green">✔</span> Network web_map_default  <span style="color:green">Created</span>
-><span style="color:green">✔</span> Container web_map-web-1  <span style="color:green">Started</span>
+>✔ Network web_map_default Created
+>
+>✔Container web_map-web-1 Started
 
 -Перейти на http://127.0.0.1:8000/
 
 *Остановка:* **<span style="color:red">Осторожно, останавливает и удаляет другие контейнеры!</span>**
 
->\$ docker stop \$(docker ps -all -q)
->\$docker rm \$(docker ps -all -q)
+>\$ docker stop $(docker ps -all -q)
+>
+>\$ docker rm $(docker ps -all -q)
 
 ***Без Docker***
 
 -Установить python
 
--Сделвть виртуальное окружение и активировать его
+-Сделать виртуальное окружение и активировать его
 
 -Установить зависимости с помощью команды: pip install -r req.txt
 
