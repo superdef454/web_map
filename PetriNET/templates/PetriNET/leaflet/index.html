@@ -53,7 +53,7 @@
                     <input type="text" class="form-control" id="BusStopName" placeholder="Название остановки"
                         aria-label="Название остановки" aria-describedby="basic-addon2">
                     <div class="input-group-append">
-                        <button id="BusStopAdd" class="btn btn-primary" type="button">+</button>
+                        <button id="BusStopAdd" class="btn btn-primary" type="button" title="Двойной клик по карте, удержание для переноса">+</button>
                     </div>
                 </div>
             </div>
@@ -520,11 +520,28 @@
         $('#FilePetri').trigger('click');
     });
 
-    // Обработка кнопки Выбрать маршрут
+    // Обработка кнопки Выбрать маршруты
     function RoutsChoose() {
         if (!CityExists()) {
             return
         }
+        let modal = $("#ChoiceRoute")
+        let body = modal.find(".modal-body")
+        if (Routes.length > 0) {
+            body.html(`
+            <div class="d-flex justify-content-center flex-wrap bd-highlight">
+            `)
+            Routes.forEach((route, index) => {
+                body.append(`<div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="ChoiceOneRoute(${route.id})">${index + 1}: ${route.name}</div>`)// <button type="button" class="btn btn-primary" onclick="ChoiceOneRoute(${route.id})">${route.name}</button></div>`)
+            })
+            body.append(`
+            </div>
+            `)
+        }
+        else {
+            body.html('<p>Маршрутов нет</p>')
+        }
+        modal.modal('show')
     }
 
     // Обработка кнопки Расчёт
