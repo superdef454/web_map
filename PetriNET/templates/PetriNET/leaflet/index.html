@@ -134,15 +134,15 @@
                         <div class="btn-group" role="group">
                             <!-- Ускорить -->
                             <button type="button" class="btn btn-primary" onclick="setSingleStep(0)"><i class="fas fa-angle-right"></i></button>
-                            <button type="button" class="btn btn-primary" onclick="setSingleStep(5)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
-                            <button type="button" class="btn btn-primary" onclick="setSingleStep(25)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(10)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(50)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
                             <div class="input-group-text" id="SingleStepTitle">1</div>
                         </div>
                     </div>
                     <div class="col">
                         <div class="btn-group" role="group">
                             <!-- Сброс -->
-                            <button type="button" class="btn btn-primary" onclick="setRangeValue(1)"><i class="fas fa-redo"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="stopTimer(), setRangeValue(1)"><i class="fas fa-redo"></i></button>
                             <!-- Запуск -->
                             <button type="button" class="btn btn-success" onclick="playTimer()"><i class="fas fa-play"></i></button>
                             <!-- Пауза -->
