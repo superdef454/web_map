@@ -7,6 +7,11 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <link rel="stylesheet" href="{% static 'css/index.css' %}">
+<!-- Иконки -->
+<link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">
+<link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
+<link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
+<link rel="icon" type="image/svg+xml" href="{% static 'bus-solid.svg' %}">
 {% endblock %}
 {% block js %}
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
@@ -87,9 +92,65 @@
                 <div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="RoutsChoose()">Выбрать
                     маршруты
                 </div>
-                <div type="button" class="btn btn-danger bd-highlight mb-3 mr-3" onclick="">Сброс</div>
+                <div type="button" class="btn btn-danger bd-highlight mb-3 mr-3" onclick="Reset()">Сброс</div>
                 <div type="button" class="btn btn-success bd-highlight mb-3 mr-3 btn-block" onclick="Сalculation()">
                     Расчёт
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Див нижней панели имитации работы онлайн -->
+<div id="bottom-panel" class="container d-none justify-content-center align-items-center">
+    <!-- d-flex -->
+    <div id="bottom-function-panel" class="row shadow-sm">
+        <div class="card border-primary w-100 mb-4">
+            <div class="card-header bg-light">
+                Имитация работы транспортной сети
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="end_simulation()">
+                    <span aria-hidden="true">×</span>
+                </button>    
+            </div>
+            <div class="card-body text-center">
+                <div class="row">            
+                    <div class="col">
+                        <input type="range" class="form-range w-100" id="StepsImitation" min="1" step="1">
+                    </div>
+                </div>
+                <div class="row">            
+                    <div class="col small mb-2" style="text-align: left;">
+                        Шаг
+                    </div>
+                    <div class="col small mb-2" id="StepNow">
+                        50
+                    </div>
+                    <div class="col small mb-2" id="LenStep" style="text-align: right;">
+                        100
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col" style="text-align: left;">
+                        <div class="btn-group" role="group">
+                            <!-- Ускорить -->
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(0)"><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(5)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(25)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <div class="input-group-text" id="SingleStepTitle">1</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="btn-group" role="group">
+                            <!-- Сброс -->
+                            <button type="button" class="btn btn-primary" onclick="setRangeValue(1)"><i class="fas fa-redo"></i></button>
+                            <!-- Запуск -->
+                            <button type="button" class="btn btn-success" onclick="playTimer()"><i class="fas fa-play"></i></button>
+                            <!-- Пауза -->
+                            <button type="button" class="btn btn-danger" onclick="stopTimer()"><i class="fas fa-pause"></i></button>
+                        </div>
+                    </div>
+                    <div class="col">
+                    </div>
                 </div>
             </div>
         </div>
@@ -143,7 +204,7 @@
             </div>
             <div class="modal-body text-center">
                 <button class="btn btn-primary" type="button">Показать отчёт</button>
-                <button class="btn btn-primary" type="button">Имитировать работу онлайн</button>
+                <button class="btn btn-primary" data-dismiss="modal" type="button" onclick="simulation()">Имитировать работу онлайн</button>
             </div>
         </div>
     </div>
@@ -544,11 +605,19 @@
         modal.modal('show')
     }
 
+    // Обработка кнопки Сброс
+    function Reset() {
+    }
+
+
     // Обработка кнопки Расчёт
     function Сalculation() {
         if (!CityExists()) {
             return
         }
+        data = Object // TODO Заменить на запрос к серверу
+        data.error = 0
+        analysis_of_calculation_result(data)
     }
 
     // Разбор файла пользователя
@@ -570,14 +639,8 @@
                             petri_data: petri_data
                         },
                         success: function (data) {
-                            responce = JSON.parse(data)
-                            if (responce.error == 0) {
-                                let modal = $("#AnalysisOfCalculationResults");
-                                modal.modal('show')
-                            }
-                            else {
-                                alert("Ошибка расчёта\nОтвет сервера: " + responce.error + ' ' + responce.error_messgae)
-                            }
+                            data_from_server = JSON.parse(data)
+                            analysis_of_calculation_result(data_from_server)
                         },
                         error: function (jqXHR, exception) {
                             alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
@@ -588,6 +651,106 @@
             }
         }
     }
+
+    // Функция разбора результатов расчёта
+    function analysis_of_calculation_result(data_from_server) {
+        if (data_from_server.error == 0) {
+            let modal = $("#AnalysisOfCalculationResults");
+            modal.modal('show')
+        }
+        else {
+            alert("Ошибка расчёта\nОтвет сервера: " + data_from_server.error + ' ' + data_from_server.error_messgae)
+        }
+    }
+
+    // Глобальные переменные для имитации работы
+    let step_speed = 400
+    let timer = null
+
+    // Имитировать работу онлайн
+    function simulation() {
+        // Скрыть левую панель
+        $("#left-panel").removeClass("d-flex");
+        $("#left-panel").addClass("d-none");
+        // Показать нижнюю
+        $("#bottom-panel").removeClass("d-none");
+        // Очистить карту
+
+
+        // Указать у StepsImitation количество step и max
+        var maxSteps = 200; // Установите здесь желаемое количество шагов
+        $("#StepsImitation").attr("max", maxSteps);
+        $("#LenStep").text(maxSteps);
+        setRangeValue(1)
+        setSingleStep(0)
+    }
+
+    // Функция для автоматического установления значения в input type="range"
+    function setRangeValue(step) {
+        $("#StepsImitation").val(step);
+        $("#StepNow").text(step);
+    }
+
+    // Увеличить шаг на single_step
+    function incrRangeValue() {
+        step = parseInt($("#StepsImitation").val(), 10);
+        maxSteps = parseInt($("#StepsImitation").attr("max"), 10)
+        if (step >= maxSteps) {
+            stopTimer()
+            return
+        }
+        step += 1
+        setRangeValue(step)
+    }
+
+    // Функция работы с step_speed
+    function setSingleStep(step_diff) {
+        if (step_diff == 0) {
+            step_speed = 400
+        }
+        else {
+            step_speed -= step_diff
+            step_speed = Math.abs(step_speed);
+        }
+        $("#SingleStepTitle").text(step_speed + "мс.");
+    }
+
+    $("#StepsImitation").on("input", function() {
+        // Функция отрисовки текущего шага
+        $("#StepNow").text($(this).val());
+    });
+
+    function Step() {
+        incrRangeValue()
+    }
+
+    function playTimer() {
+        if (timer != null) {
+            clearInterval(timer);
+        }
+        timer = setInterval(Step, step_speed)
+    }
+
+    function stopTimer() {
+        if (timer != null) {
+            clearInterval(timer);
+        }
+    }
+
+    // Закончить имитацию
+    function end_simulation() {
+        stopTimer()
+        // Скрыть нижнюю панель
+        $("#bottom-panel").addClass("d-none");
+        // Показать левую
+        $("#left-panel").removeClass("d-none");
+        $("#left-panel").addClass("d-flex");
+        // Вернуть данные на карту
+    }
+
+    $(document).ready(function() {
+        // simulation()  // TODO Убрать
+    })
 
     ListColour = [
         "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"
