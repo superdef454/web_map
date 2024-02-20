@@ -175,12 +175,12 @@
 </div>
 
 <!-- Модальное окно выбора маршрутов для расчёта-->
-<!-- <div class="modal fade" id="ChoiceRoute" tabindex="-1" aria-labelledby="ChoiceRouteTitle" style="display: none;"
+<div class="modal fade" id="ChoiceRouteForCalculate" tabindex="-1" aria-labelledby="ChoiceRouteTitle" style="display: none;"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="ChoiceRouteTitle">Выберите маршрут</h5>
+                <h5 class="modal-title" id="ChoiceRouteTitle">Выберите маршруты для расчёта</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">×</span>
                 </button>
@@ -189,7 +189,7 @@
             </div>
         </div>
     </div>
-</div> -->
+</div>
 
 <!-- Модальное окно отображения результатов расчёта-->
 <div class="modal fade" id="AnalysisOfCalculationResults" tabindex="-1"
@@ -214,12 +214,17 @@
 
 {% block endjs %}
 <script>
+    let CurrentCity
+    let Routes = []
+
+    // Переменные для добавления данных
     let ActionOnClick = ""
     let TempMarker
     let TempRoute
     let TempRouteList = []
-    let CurrentCity
-    let Routes = []
+
+    // Переменные для расчёта
+    let RoutesForCalculate = []
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
     L.control.attribution({ prefix: 'Маршрутно-транспортные сети | <a href="{% url "admin:index" %}">Админ панель</a>' }).addTo(map);
@@ -523,7 +528,7 @@
         $("#BusStopAdd").text('+');
     }
 
-    // Запрос к бд для получения данных города и его маршрутов
+    // Выбор города, запрос к бд для получения данных города и его маршрутов
     function ChoiceCity(id) {
         let CityID = id
         let City = citys.find(el => el.id == CityID)
@@ -532,6 +537,9 @@
         map.setView([City.latitude, City.longitude], 12);
         if (CurrentCity !== City) {
             CloseAllAction();
+            if (CurrentCity) {
+                Reset()
+            }
             BusStops.clearLayers();
             RouteLayer.clearLayers();
             Routes = [];
@@ -586,14 +594,20 @@
         if (!CityExists()) {
             return
         }
-        let modal = $("#ChoiceRoute")
+        let modal = $("#ChoiceRouteForCalculate")
         let body = modal.find(".modal-body")
-        if (Routes.length > 0) {
+        if (body.html().trim() !== '') {}
+        else if (Routes.length > 0) {
             body.html(`
             <div class="d-flex justify-content-center flex-wrap bd-highlight">
             `)
             Routes.forEach((route, index) => {
-                body.append(`<div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="ChoiceOneRoute(${route.id})">${index + 1}: ${route.name}</div>`)// <button type="button" class="btn btn-primary" onclick="ChoiceOneRoute(${route.id})">${route.name}</button></div>`)
+                body.append(`
+                    <button id="RouteCheckbox${route.id}" type="button" class="btn btn-primary bd-highlight mb-3 mr-3" data-toggle="button" aria-pressed="false"
+                    onclick="RouteCheck(${route.id});">
+                    ${index + 1}: ${route.name}
+                    </button>
+                `)
             })
             body.append(`
             </div>
@@ -605,8 +619,43 @@
         modal.modal('show')
     }
 
+    // Функция обработки нажатия кнопок маршрутов
+    function RouteCheck(id) {
+        btn = $('#RouteCheckbox' + id)
+        route = Routes.find(route => route.id == id)
+        if (!route) {
+            alert("Маршрут не найден!")
+            return
+        }
+        if (!btn.hasClass('active')) {
+            RoutesForCalculate.push(route)
+        }
+        else {
+            let include = -1
+            RoutesForCalculate.forEach((item, index) => {
+                if (item.id == id) {
+                    include = index
+                }
+            })
+            if (include >= 0) {
+                RoutesForCalculate.splice(include, 1);
+            }
+        }
+        if (RoutesForCalculate.length > 0) {
+            RouteLayer.clearLayers();
+            RoutesForCalculate.forEach((route, index) => {
+                DrawRoute(route);
+            })
+        }
+    }
+
     // Обработка кнопки Сброс
     function Reset() {
+        let modal = $("#ChoiceRouteForCalculate")
+        let body = modal.find(".modal-body")
+        body.html('')
+        RoutesForCalculate = []
+        ShowAllRoutes()
     }
 
 
