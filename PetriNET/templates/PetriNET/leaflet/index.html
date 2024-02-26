@@ -68,16 +68,12 @@
                 Маршруты
             </div>
             <div class="card-body text-center">
-                <div class="input-group mb-3">
-                    <div class="btn-group">
-                        <button class="btn btn-primary" id="RouteAll" type="button" onclick="ShowAllRoutes()">Показать
+                    <div class="btn-group d-flex mb-3">
+                        <button class="btn btn-primary w-100" id="RouteAll" type="button" onclick="ShowAllRoutes()">Показать
                             все</button>
-                        <button class="btn btn-primary" id="RouteOne" type="button">Выбрать один</button>
-                    </div>
-                    <div class="input-group-append">
+                        <button class="btn btn-primary w-100" id="RouteOne" type="button">Выбрать один</button>
                         <button id="RouteAdd" class="btn btn-primary" type="button">+</button>
                     </div>
-                </div>
             </div>
         </div>
         <div class="card bg-transparent border-primary w-100 mb-3">
@@ -89,10 +85,14 @@
                 <button class="btn btn-primary mb-3 btn-block" id="FilePetriButton" type="button">Из <a
                         href="{% static 'petri_example.json' %}" title="Скачать пример файла" download=""
                         class="text-white" onclick="event.stopPropagation();">файла</a></button>
-                <div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="RoutsChoose()">Выбрать
-                    маршруты
+                <div class="btn-group d-flex mb-3">
+                    <div type="button" class="btn btn-primary bd-highlight w-100" onclick="RoutsChoose()">Выбрать
+                        маршруты
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="DownloadData"><i
+                        class="fas fa-floppy-disk"></i></button>
+                    <div type="button" class="btn btn-danger bd-highlight" onclick="Reset()">Сброс</div>
                 </div>
-                <div type="button" class="btn btn-danger bd-highlight mb-3 mr-3" onclick="Reset()">Сброс</div>
                 <div type="button" class="btn btn-success bd-highlight mb-3 mr-3 btn-block" onclick="Сalculation()">
                     Расчёт
                 </div>
