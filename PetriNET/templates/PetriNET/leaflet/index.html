@@ -223,8 +223,11 @@
     let TempRoute
     let TempRouteList = []
 
+    let EI = "Людей"
+
     // Переменные для расчёта
     let RoutesForCalculate = []
+    let BSPassengersDirections = {}
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
     L.control.attribution({ prefix: 'Маршрутно-транспортные сети | <a href="{% url "admin:index" %}">Админ панель</a>' }).addTo(map);
@@ -316,7 +319,7 @@
                     },
                     success: function (data) {
                         if (JSON.parse(data).error == 0) {
-                            CreateBS(TempMarker.getLatLng(), `<a href="{% url 'admin:index' %}PetriNET/busstop/${JSON.parse(data).BusStop.id}/change/"><p>${BusStopName}</p></a>`);
+                            AddBS(TempMarker.getLatLng(), JSON.parse(data).BusStop.id, BusStopName);
                             CloseAllAction();
                         }
                         else {
@@ -386,6 +389,9 @@
                 $("#RouteAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
                 $("#RouteAdd").text('✓');
             }
+        }
+        else {
+            SetDataToBSPopup()
         }
     }
 
@@ -486,7 +492,22 @@
     }
 
     // Добавление остановки в группу остановок на карту
-    function CreateBS(latlng, popup) {
+    function AddBS(latlng, id, name) {
+        let popup = `<a href="{% url 'admin:index' %}PetriNET/busstop/${id}/change/"><p>${name} ID: ${id}</p></a>`
+        popup += `
+            <div class="BusStopPassengers">
+                <input id="BSID" type="text" value="${id}" hidden>
+                <div id="DirectionsSheet" class="text-sm">
+                    <div class="input-group d-flex flex-nowrap mb-1">
+                        <div class="input-group-prepend">
+                        <div class="input-group-text" id="btnGroupAddon">${EI}</div>
+                        </div>
+                        <input type="number" id="PassengersWithoutDirection" class="form-control" style="width: 180px;" placeholder="В случайное направление" aria-label="В случайное направление" aria-describedby="btnGroupAddon" min="0">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-block mt-3" title="Добавить направление" onclick="AddDirection(this, ${id})">+</button>
+            </div>
+            `
         BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
     }
 
@@ -556,7 +577,7 @@
                 },
                 success: function (data) {
                     JSON.parse(data).BSList.forEach(BS => {
-                        CreateBS([BS.latitude, BS.longitude], `<a href="{% url 'admin:index' %}PetriNET/busstop/${BS.id}/change/"><p>${BS.name}</p></a>`);
+                        AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
                     });
                     JSON.parse(data).RouteList.forEach(Route => {
                         CreateRoute(Route.list_coord, Route.id, Route.name)
@@ -619,6 +640,120 @@
         modal.modal('show')
     }
 
+
+    //////
+    // Функции работы с заполнением кол-ва пассажиров
+    //////
+
+    
+    function GetPopudBS(id) {
+        BSPopup = null
+        $(".BusStopPassengers").each(function() {
+            var popupContent = $(this)
+            var BSIDValue = popupContent.find("#BSID").val();
+            if (id && BSIDValue && BSIDValue == id) {
+                BSPopup = this
+            }
+            else if (!id) {
+                BSPopup = this
+            }
+        });
+        // if (BSPopup) {
+        //     return BSPopup
+        // }
+        // else if (id) {
+        //     BusStops.eachLayer(function(layer) {
+        //         if (layer.getPopup) {
+        //             var popup = layer.getPopup();
+        //             var popupContent = $(popup.getContent()); 
+        //             if (popupContent.find('#BSID').length > 0) {
+        //                 var BSIDValue = popupContent.find('#BSID').val();
+        //                 if (BSIDValue && BSIDValue == id) {
+        //                     BSPopup = popup.getContent()
+        //                     return BSPopup
+        //                 }
+        //             }
+        //         }
+        //     });
+        // }
+        return BSPopup
+    }
+
+    function AddDirection(button, id) {
+        let parentDiv = $(button).closest('.BusStopPassengers');
+        let DirectionsSheetDiv = $(parentDiv).find('#DirectionsSheet')
+        const divCount = DirectionsSheetDiv.find('.input-group').length
+        DirectionsSheetDiv.append(
+        `                    
+        <div class="input-group mb-1" id="${divCount}">
+            <input type="number" id="BusStopID${divCount}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
+            <input type="number" id="PassengersCount${divCount}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
+        </div>
+        `
+        )
+        let BSIDValue = $(parentDiv).find('#BSID').val();
+    }
+
+    $(document).on('change', '.leaflet-popup-content input[type=number]', function() {
+        let parentDiv = $(this).closest('.BusStopPassengers');
+        let BSID = $(parentDiv).find('#BSID').val();
+        let key = $(this).attr('id');
+        let data = $(this).val();
+        data = data.replace(/[+-]/g, '')
+        if (!BSPassengersDirections[BSID]) {
+            BSPassengersDirections[BSID] = {
+                "Directions": {},
+            }
+        }
+        if (key.includes("BusStopID") || key.includes("PassengersCount")) {
+            if (key.includes("BusStopID")) {
+                base_str = "BusStopID"
+            } else {
+                base_str = "PassengersCount"
+            }
+            DirectionID = key.slice(base_str.length)
+            if (!BSPassengersDirections[BSID]["Directions"][DirectionID]) {
+                BSPassengersDirections[BSID]["Directions"][DirectionID] = {}
+            }
+            BSPassengersDirections[BSID]["Directions"][DirectionID][key] = data
+        }
+        else {
+            BSPassengersDirections[BSID][key] = data
+        }
+    });
+
+    function SetDataToBSPopup() {
+        BSPopup = GetPopudBS()
+        let DirectionsSheetDiv = $(BSPopup).find('#DirectionsSheet')
+        let BSID = $(BSPopup).find('#BSID').val();
+        $('.leaflet-popup-content input[type=number]').each(function() {
+            var key = $(this).attr('id');
+            if (BSPassengersDirections[BSID] && BSPassengersDirections[BSID][key]) {
+                $(this).val(BSPassengersDirections[BSID][key]);
+            }
+        });
+        if (BSPassengersDirections[BSID] && BSPassengersDirections[BSID]["Directions"]) {
+            for (const [key, value] of Object.entries(BSPassengersDirections[BSID]["Directions"])) {
+                var AppendDiv = `                    
+                <div class="input-group mb-1" id="${key}">
+                    <input type="number" id="BusStopID${key}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
+                    <input type="number" id="PassengersCount${key}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
+                </div>
+                `
+                DirectionsSheetDiv.append(AppendDiv)
+                for (const [InputID, InputValue] of Object.entries(value)) {
+                    DirectionsSheetDiv.find(`#${InputID}`).val(InputValue)
+                }
+            }
+        }
+    }
+
+
+    //////
+    //
+    //////
+
+
     // Функция обработки нажатия кнопок маршрутов
     function RouteCheck(id) {
         btn = $('#RouteCheckbox' + id)
@@ -655,6 +790,8 @@
         let body = modal.find(".modal-body")
         body.html('')
         RoutesForCalculate = []
+        BSPassengersDirections = {}
+        map.closePopup()
         ShowAllRoutes()
     }
 
@@ -727,7 +864,7 @@
 
 
         // Указать у StepsImitation количество step и max
-        var maxSteps = 200; // Установите здесь желаемое количество шагов
+        let maxSteps = 200; // Установите здесь желаемое количество шагов
         $("#StepsImitation").attr("max", maxSteps);
         $("#LenStep").text(maxSteps);
         setRangeValue(1)
