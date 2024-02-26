@@ -89,7 +89,7 @@
                     <div type="button" class="btn btn-primary bd-highlight w-100" onclick="RoutsChoose()">Выбрать
                         маршруты
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="DownloadData"><i
+                    <button type="button" class="btn btn-primary" onclick="DownloadDataToCalculate()"><i
                         class="fas fa-floppy-disk"></i></button>
                     <div type="button" class="btn btn-danger bd-highlight" onclick="Reset()">Сброс</div>
                 </div>
@@ -497,12 +497,12 @@
         popup += `
             <div class="BusStopPassengers">
                 <input id="BSID" type="text" value="${id}" hidden>
-                <div id="DirectionsSheet" class="text-sm">
+                <div id="DirectionsSheet">
                     <div class="input-group d-flex flex-nowrap mb-1">
                         <div class="input-group-prepend">
                         <div class="input-group-text" id="btnGroupAddon">${EI}</div>
                         </div>
-                        <input type="number" id="PassengersWithoutDirection" class="form-control" style="width: 180px;" placeholder="В случайное направление" aria-label="В случайное направление" aria-describedby="btnGroupAddon" min="0">
+                        <input type="number" id="PassengersWithoutDirection" class="form-control" style="width: 220px;" placeholder="В случайное направление" aria-label="В случайное направление" aria-describedby="btnGroupAddon" min="0">
                     </div>
                 </div>
                 <button type="button" class="btn btn-primary btn-block mt-3" title="Добавить направление" onclick="AddDirection(this, ${id})">+</button>
@@ -753,6 +753,11 @@
     //
     //////
 
+
+    // Функция Скачивания данных для расчёта
+    function DownloadDataToCalculate() {
+
+    }
 
     // Функция обработки нажатия кнопок маршрутов
     function RouteCheck(id) {
