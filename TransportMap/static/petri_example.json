@@ -1,3 +1,27 @@
 {
-    "title": "Привет"
+    "routs": [
+        {
+            "id": 1,
+            "name": "Название маршрута"
+        }
+    ],
+    "busstops": {
+        "1": {
+            "Directions": {},
+            "PassengersWithoutDirection": "5"
+        },
+        "2": {
+            "Directions": {
+                "1": {
+                    "BusStopID1": "1",
+                    "PassengersCount1": "10"
+                },
+                "2": {
+                    "BusStopID2": "3",
+                    "PassengersCount2": "5"
+                }
+            }
+        }
+    },
+    "city_id": 1
 }

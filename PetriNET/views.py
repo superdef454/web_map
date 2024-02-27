@@ -146,20 +146,19 @@ def ajax_city_data_get(request):
 def load_calculation(request):
     if request.method == "POST":
         if request.user.is_authenticated:
-            city_id = request.POST.get('city_id')
             try:
-                petri_data = json.loads(request.POST.get('petri_data'))
+                DataToCalculate = json.loads(request.POST.get('DataToCalculate'))
             except Exception:
                 return JsonResponse({
                     'error': 1,
                     'error_messgae': 'Ошибка заполнения данных'
                 })                
-            if not city_id or not petri_data:
+            if not DataToCalculate:
                 return JsonResponse({
                     'error': 1,
                     'error_messgae': 'Ошибка заполнения данных'
                 })
-            print(petri_data)
+            print(DataToCalculate)
             # city = City.objects.get(id=city_id)
             response = {'error': 0}
             # BSList = list(BusStop.objects.filter(city=city).values('name', 'latitude', 'longitude', 'id'))
