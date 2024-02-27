@@ -22,6 +22,12 @@
     z-index: 900;
 }
 
+.partition{
+    border-left: solid white;
+    border-width: 0px 0px 0px 1px;
+}
+
+
 /* Для WebKit-браузеров */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
