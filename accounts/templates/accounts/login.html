@@ -1,7 +1,57 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/index.css' %}">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+{% endblock %}
+
 {% block body %}
-    Вход <a href="{% url 'accounts:register' %}">Зарегистрироваться</a>
-    {% include 'inc_form.html' with form=form %}
+    <div class="container d-flex align-items-center justify-content-center text-center" style="min-height: 100vh;">
+        <div class="card">
+            <div class="card-body">
+                <img class="mb-4" src="{% static 'bus-solid.svg' %}" alt="" width="72" height="72">
+                {% block lable %}
+                    <h2 class="card-title mb-4">Вход <a href="{% url 'accounts:register' %}">регистрация</a></h2>
+                {% endblock %}
+                <form method="post" action="{% url 'accounts:login' %}">
+                    {% csrf_token %}
+                    <div class="container">
+                        {% for field in form %}
+                        <div class="row mb-3">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">{{ field.label }}</span>
+                                </div>
+                                {{ field }}
+                            </div>
+                        </div>
+                        {% if field.errors %}
+                            <div class="row mb-3">
+                                {% for error in field.errors %}
+                                    <div class="alert alert-danger" role="alert">
+                                        {{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% for err in form.non_field_errors %}
+                    <div class="alert alert-danger w-100" role="alert">
+                        {{ err }}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary mt-3 w-100">Войти</button>
+                </form>
+                <p class="mt-4 text-muted">© 2023-2024</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+
+{% block endjs %}
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 {% endblock %}

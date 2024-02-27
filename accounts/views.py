@@ -3,15 +3,10 @@ from django.contrib.auth import login
 from django.views.generic import CreateView
 from django.urls import reverse_lazy
 
-from django.contrib.auth.forms import (
-    AuthenticationForm,
-)
-from django.contrib.auth.forms import (
-    UserCreationForm,
-)
+from accounts.forms import CustomAuthenticationForm, CustomUserCreationForm
 
 class AccountLogin(LoginView):
-    form_class = AuthenticationForm
+    form_class = CustomAuthenticationForm
     template_name = 'accounts/login.html'
 
     def get_context_data(self, **kwargs):
@@ -32,7 +27,7 @@ class AccountLogout(LogoutView):
 
 
 class AccountRegister(CreateView):
-    form_class = UserCreationForm
+    form_class = CustomUserCreationForm
     template_name = 'accounts/registration.html'
     success_url = reverse_lazy('PetriNET:main_map')
 

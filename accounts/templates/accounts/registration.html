@@ -1,7 +1,6 @@
-{% extends 'base.html' %}
+{% extends 'accounts/login.html' %}
 {% load static %}
 
-{% block body %}
-    Регистрация
-    {% include 'inc_form.html' with form=form %}
+{% block lable %}
+<h2 class="card-title mb-4"><a href="{% url 'accounts:login' %}">Вход</a> регистрация</h2>
 {% endblock %}

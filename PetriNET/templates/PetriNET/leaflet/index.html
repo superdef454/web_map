@@ -11,7 +11,6 @@
 <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">
 <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
 <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
-<link rel="icon" type="image/svg+xml" href="{% static 'bus-solid.svg' %}">
 {% endblock %}
 {% block js %}
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
@@ -296,14 +295,14 @@
 
     // Кнопка добавления остановки
     $("#BusStopAdd").click(function () {
-        $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
         if (!CityExists()) {
             return
         }
         let BusStopName = $("#BusStopName").val()
         if (BusStopName) {
             if (ActionOnClick == 'AddTempMarker' && typeof TempMarker !== "undefined" && TempMarker !== null) {
-                $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+                $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
                 $(this).text('+');
                 const csrftoken = getCookie('csrftoken');
                 $.ajax({
@@ -338,7 +337,7 @@
                 CloseAllAction();
                 return
             }
-            $(this).attr('style', 'background-color: #dc3545; border-color: #dc3545;');
+            $(this).removeClass('btn-success btn-primary').addClass('btn-danger');
             $(this).text('x');
             ActionOnClick = 'AddTempMarker'
         }
@@ -364,7 +363,7 @@
                 TempRouteList.push(latlng)
             }
             if (TempRouteList.length <= 1) {
-                $("#RouteAdd").attr('style', 'background-color: #dc3545; border-color: #dc3545;');
+                $("#RouteAdd").removeClass('btn-success btn-primary').addClass('btn-danger');
                 $("#RouteAdd").text('x');
                 if (TempRoute) {
                     TempRoute.remove()
@@ -386,7 +385,7 @@
                 }).addTo(map);
             }
             if (TempRouteList.length > 1) {
-                $("#RouteAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
+                $("#RouteAdd").removeClass('btn-danger btn-primary').addClass('btn-success');
                 $("#RouteAdd").text('✓');
             }
         }
@@ -397,12 +396,12 @@
 
     // Кнопка добавления маршрута
     $("#RouteAdd").click(function () {
-        $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
         if (!CityExists()) {
             return
         }
         if (ActionOnClick == 'AddTempRoute' && typeof TempRoute !== "undefined" && TempRoute !== null) {
-            $(this).attr('style', 'background-color: #007bff; border-color: #007bff;');
+            $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
             $(this).text('+');
             const csrftoken = getCookie('csrftoken');
             $.ajax({
@@ -436,7 +435,7 @@
             return
         }
         RouteLayer.clearLayers();
-        $(this).attr('style', 'background-color: #dc3545; border-color: #dc3545;');
+        $(this).removeClass('btn-primary btn-success').addClass('btn-danger');
         $(this).text('x');
         ActionOnClick = 'AddTempRoute'
     });
@@ -537,7 +536,7 @@
         TempRoute = null;
         TempRouteList = [];
         ActionOnClick = "";
-        $("#RouteAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $("#RouteAdd").removeClass('btn-danger btn-success').addClass('btn-primary');
         $("#RouteAdd").text('+');
         if (TempMarker) {
             TempMarker.remove();
@@ -545,7 +544,7 @@
         TempMarker = null;
         ActionOnClick = "";
         $("#BusStopName").val('');
-        $("#BusStopAdd").attr('style', 'background-color: #007bff; border-color: #007bff;');
+        $("#BusStopAdd").removeClass('btn-danger btn-success').addClass('btn-primary');
         $("#BusStopAdd").text('+');
     }
 
@@ -597,7 +596,7 @@
             TempMarker = L.marker([event.latlng.lat, event.latlng.lng], { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
                 CloseAllAction();
             })
-            $("#BusStopAdd").attr('style', '    background-color: #28a745; border-color: #28a745;');
+            $("#BusStopAdd").removeClass('btn-danger btn-primary').addClass('btn-success');
             $("#BusStopAdd").text('✓');
         }
     })
