@@ -85,7 +85,7 @@
                         href="{% static 'petri_example.json' %}" title="Скачать пример файла" download=""
                         class="text-white" onclick="event.stopPropagation();">файла</a></button>
                 <div class="btn-group d-flex mb-3">
-                    <div type="button" class="btn btn-primary bd-highlight w-100" onclick="RoutsChoose()">Выбрать
+                    <div type="button" class="btn btn-primary bd-highlight w-100" onclick="RoutesChoose()">Выбрать
                         маршруты
                     </div>
                     <button type="button" class="btn btn-primary partition" onclick="DownloadDataToCalculate()"
@@ -645,7 +645,7 @@
     }
 
     // Обработка кнопки Выбрать маршруты
-    function RoutsChoose() {
+    function RoutesChoose() {
         if (!CityExists()) {
             return
         }
@@ -697,12 +697,18 @@
     function AddDirection(button, id) {
         let parentDiv = $(button).closest('.BusStopPassengers');
         let DirectionsSheetDiv = $(parentDiv).find('#DirectionsSheet')
-        const divCount = DirectionsSheetDiv.find('.input-group').length
+        let LastDiv = DirectionsSheetDiv.find('.input-group').last().attr("id")
+        if (!LastDiv) {
+            LastDiv = 1
+        }
+        else {
+            LastDiv = parseInt(LastDiv) + 1
+        }
         DirectionsSheetDiv.append(
         `                    
-        <div class="input-group mb-1" id="${divCount}">
-            <input type="number" id="BusStopID${divCount}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
-            <input type="number" id="PassengersCount${divCount}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
+        <div class="input-group mb-1" id="${LastDiv}">
+            <input type="number" id="BusStopID${LastDiv}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
+            <input type="number" id="PassengersCount${LastDiv}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
         </div>
         `
         )
@@ -775,7 +781,7 @@
             return null
         }
         DataToCalculate = {
-            "routs": RoutesForCalculate.map(({ id, name }) => ({ id, name })),
+            "routes": RoutesForCalculate.map(({ id, name }) => ({ id, name })),
             "busstops": BSPassengersDirections,
             "city_id": CurrentCity.id,
         }
@@ -902,7 +908,7 @@
                         }
                         BSPassengersDirections = DataToCalculate.busstops
                         RoutesForCalculate = Routes.filter(route =>
-                            DataToCalculate.routs.some(rout => rout.id == route.id)
+                            DataToCalculate.routes.some(rout => rout.id == route.id)
                         );
                         SetChoiceRouteForCalculate()
                         RoutesForCalculate.forEach((route, index) => {

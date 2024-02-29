@@ -58,3 +58,21 @@ python 3.10.6
 -Запустить тестовый сервер: python manage.py runserver
 
 -Перейти на http://127.0.0.1:8000/
+
+<!-- TODO
+
+Реализовать сжатие на стороне nginx т.к. будут передаваться большие данные в методе load_calculation
+
+настройка:
+
+Откройте конфигурационный файл Nginx (обычно nginx.conf) для редактирования.
+Включите Gzip сжатие, добавив или убедившись в наличии следующих директив в http блоке:
+http {
+    ...
+    gzip on;
+    gzip_types text/plain application/xml application/json application/javascript text/css;
+    gzip_proxied any;
+    ...
+}
+
+sudo systemctl reload nginx -->
