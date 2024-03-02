@@ -315,7 +315,7 @@
                 $(this).text('+');
                 const csrftoken = getCookie('csrftoken');
                 $.ajax({
-                    url: '{% url "PetriNET:ajax_bs_add" %}',
+                    url: '{% url "PetriNET:create_bs" %}',
                     method: 'post',
                     dataType: 'html',
                     headers: { 'X-CSRFToken': csrftoken },
@@ -332,7 +332,7 @@
                         }
                         else {
                             CloseAllAction();
-                            alert("Ошибка добавления остановки\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
+                            alert("Ошибка добавления остановки\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_message)
                         }
                     },
                     error: function (jqXHR, exception) {
@@ -414,7 +414,7 @@
             $(this).text('+');
             const csrftoken = getCookie('csrftoken');
             $.ajax({
-                url: '{% url "PetriNET:ajax_route_add" %}',
+                url: '{% url "PetriNET:create_route" %}',
                 method: 'post',
                 dataType: 'html',
                 headers: { 'X-CSRFToken': csrftoken },
@@ -429,7 +429,7 @@
                         $("#RouteAll").click();
                     }
                     else {
-                        alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_messgae)
+                        alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_message)
                     }
                 },
                 error: function (jqXHR, exception) {
@@ -576,8 +576,8 @@
             $("#dropdownMenuButton").text(City.name);
             const csrftoken = getCookie('csrftoken');
             $.ajax({
-                url: '{% url "PetriNET:ajax_city_data_get" %}',
-                method: 'post',
+                url: '{% url "PetriNET:get_city_data" %}',
+                method: 'get',
                 dataType: 'html',
                 headers: { 'X-CSRFToken': csrftoken },
                 data: {
@@ -932,7 +932,7 @@
             modal.modal('show')
         }
         else {
-            alert("Ошибка расчёта\nОтвет сервера: " + data_from_server.error + ' ' + data_from_server.error_messgae)
+            alert("Ошибка расчёта\nОтвет сервера: " + data_from_server.error + ' ' + data_from_server.error_message)
         }
     }
 
