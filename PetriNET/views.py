@@ -7,7 +7,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from PetriNET.petri_net_utils import GetDataToCalculate
+from PetriNET.petri_net_utils import DataCalculation, GetDataToCalculate
 from PetriNET.utils import auth_required
 
 from .models import City, BusStop, Route
@@ -93,7 +93,7 @@ class RouteView(View):
 
     @method_decorator(auth_required())
     def post(self, request):
-        """Добавление остановки"""
+        """Добавление маршрута"""
         list_coord = json.loads(request.POST.get('list_coord'))
         name = request.POST.get('name')
         city_id = request.POST.get('city_id')
@@ -103,8 +103,8 @@ class RouteView(View):
                 'error_message': 'Ошибка заполнения данных'
             })
         try:
-            list_bs = [BusStop.objects.get(latitude = bs[0], longitude = bs[1]) for bs in list_coord]
-        except:
+            list_bs = [BusStop.objects.get(latitude=bs[0], longitude=bs[1]) for bs in list_coord]
+        except Exception:
             return JsonResponse({
                 'error': 1,
                 'error_message': 'Ошибка заполнения данных'
@@ -123,7 +123,6 @@ class RouteView(View):
             }})
 
 
-
 class Calculate(View):
     """Класс расчёта нагрузки"""
 
@@ -132,7 +131,7 @@ class Calculate(View):
         response = {'error': 0}
         try:
             request_data_to_calculate = json.loads(request.POST.get('DataToCalculate'))
-            logger.info(f"Данные для расчёта: {request_data_to_calculate}")
+            logger.info(f"Данные для разбора: {request_data_to_calculate}")
             DataToCalculate = GetDataToCalculate(request_data_to_calculate)
         except Exception:
             logger.exception("Ошибка получения данных для рассчёта")
@@ -143,5 +142,23 @@ class Calculate(View):
                 }
             )
             return JsonResponse(response)
+        else:
+            logger.info(f"Данные для расчёта: {DataToCalculate}")
+
+        try:
+            calculate = DataCalculation(DataToCalculate)
+        except Exception:
+            logger.exception("Ошибка расчёта нагрузки")
+            response.update(
+                {
+                    'error': 2,
+                    'error_message': 'Ошибка расчёта нагрузки'
+                }
+            )
+            return JsonResponse(response)
         
+        response.update({
+            'calculate': calculate
+        })
+
         return JsonResponse(response)
