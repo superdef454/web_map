@@ -48,21 +48,21 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
             }
             busstop_from_request = request_data_to_calculate['busstops'].pop(str(busstop.id), None)
             if busstop_from_request:
-                PassengersWithoutDirection = int(busstop_from_request.get('PassengersWithoutDirection', 0))
+                PassengersWithoutDirection = int(busstop_from_request.get('PWD', 0))
                 if PassengersWithoutDirection:
                     BSAddItem['directions'].update({
                         0:PassengersWithoutDirection
                     })
-            for key, value in busstop_from_request['Directions'].items():
-                BusStopID = int(value.get(f"BusStopID{key}", 0))
-                PassengersCount = int(value.get(f"PassengersCount{key}", 0))
-                if BusStopID and PassengersCount and busstops.filter(id=BusStopID).exists() and \
-                    BusStopID != busstop.id:
-                    BSAddItem['directions'].update({
-                        BusStopID:PassengersCount
-                    })
-                else:
-                    pass
+                for key, value in busstop_from_request['Directions'].items():
+                    BusStopID = int(value.get(f"BusStopID{key}", 0))
+                    PassengersCount = int(value.get(f"PassengersCount{key}", 0))
+                    if BusStopID and PassengersCount and busstops.filter(id=BusStopID).exists() and \
+                        BusStopID != busstop.id:
+                        BSAddItem['directions'].update({
+                            BusStopID:PassengersCount
+                        })
+                    else:
+                        pass
             if BSAddItem['directions']:
                 busstops_directions.append(BSAddItem)
         except Exception:

@@ -98,7 +98,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': 'log/PhoneService.log',
+            'filename': 'log/PetriNET.log',
             'formatter': 'verbose',
         },
     },
