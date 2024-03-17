@@ -1,9 +1,31 @@
 version: '3.8'
 services:
-  web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
+  optimove:
+    build: 
+      context: .
+    command: >
+      sh -c "python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
     volumes:
-      - .:/code
+      - ./:/web_map
     ports:
       - '0.0.0.0:8000:8000'
+    environment:
+      - DB_HOST=postgre
+      - DB_NAME=OptiMoVe
+      - DB_USER=postgres
+      - DB_PASS=postgres
+
+    depends_on:
+      postgre:
+        condition: service_healthy
+
+  postgre:
+    image: postgres:16.2-alpine
+    environment:
+      - POSTGRES_DB=OptiMoVe
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+

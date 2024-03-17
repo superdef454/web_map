@@ -13,8 +13,8 @@
                 <img class="mb-4" src="{% static 'bus-solid.svg' %}" alt="" width="72" height="72">
                 {% block lable %}
                     <h2 class="card-title mb-4">Вход <a href="{% url 'accounts:register' %}">регистрация</a></h2>
-                {% endblock %}
                 <form method="post" action="{% url 'accounts:login' %}">
+                {% endblock %}
                     {% csrf_token %}
                     <div class="container">
                         {% for field in form %}

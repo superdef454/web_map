@@ -4,9 +4,13 @@ FROM python:3.10.6
 EXPOSE 8000
 # Устанавливает переменную окружения, которая гарантирует, что вывод из python будет отправлен прямо в терминал без предварительной буферизации
 ENV PYTHONUNBUFFERED 1
-# Устанавливает рабочий каталог контейнера
-WORKDIR /
 # Копирует все файлы из нашего локального проекта в контейнер
-ADD ./ .
-# Запускает команду pip install для всех библиотек, перечисленных в requirements.txt
+ADD ./ /web_map
+# Устанавливает рабочий каталог контейнера
+WORKDIR /web_map
+# Запускает команду pip install для всех библиотек, перечисленных в req.txt
 RUN pip install -r req.txt
+
+# RUN adduser --disabled-password optimove
+
+# USER optimove

@@ -1,6 +1,7 @@
 asgiref==3.6.0
 Django==4.1.7
 pytz==2022.7.1
+psycopg2==2.9.9
 sqlparse==0.4.3
 tzdata==2022.7
-fontawesome-free==6.5.1
+fontawesomefree==6.5.1

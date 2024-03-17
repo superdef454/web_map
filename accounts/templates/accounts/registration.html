@@ -3,4 +3,5 @@
 
 {% block lable %}
 <h2 class="card-title mb-4"><a href="{% url 'accounts:login' %}">Вход</a> регистрация</h2>
+<form method="post" action="{% url 'accounts:register' %}">
 {% endblock %}
