@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from .models import City, BusStop, Route
+from .models import BusStop, Route
 
 logger = logging.getLogger('PetriNetManager')
 
@@ -15,15 +15,15 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     routes = []
     for request_route in request_data_to_calculate['routes']:
         route = Route.objects.filter(city_id=city_id,
-                                    id=request_route['id']).first()
+                                     id=request_route['id']).first()
         if not route:
             route = Route.objects.filter(city_id=city_id,
-                                        name__icontains=request_route['name']).first()
+                                         name__icontains=request_route['name']).first()
         if route:
             routes.append(route)
         else:
-            logger.warn("Отсутствует маршрут", args={"id":request_route['id']})
-    
+            logger.warn("Отсутствует маршрут", args={"id": request_route['id']})
+
     if not routes:
         raise Exception("Отсутствуют маршруты")
     DataToCalculate['routes'] = routes
@@ -34,12 +34,12 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
         city_id=city_id,
         route__id__in=[route.id for route in routes]
     )
-    
+
     for busstop in busstops:
         try:
             BSAddItem = {
                 "busstop": busstop,
-                "directions":{
+                "directions": {
                     # 3:5,  # 5 человек поедут на 3 ОП
                     # 4:3,  # 3 человека поедут на 4 ОП
                     # 7:2,  # 2 человека поедут на 7 ОП
@@ -51,15 +51,15 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
                 PassengersWithoutDirection = int(busstop_from_request.get('PWD', 0))
                 if PassengersWithoutDirection:
                     BSAddItem['directions'].update({
-                        0:PassengersWithoutDirection
+                        0: PassengersWithoutDirection
                     })
                 for key, value in busstop_from_request['Directions'].items():
                     BusStopID = int(value.get(f"BusStopID{key}", 0))
                     PassengersCount = int(value.get(f"PassengersCount{key}", 0))
                     if BusStopID and PassengersCount and busstops.filter(id=BusStopID).exists() and \
-                        BusStopID != busstop.id:
+                       BusStopID != busstop.id:
                         BSAddItem['directions'].update({
-                            BusStopID:PassengersCount
+                            BusStopID: PassengersCount
                         })
                     else:
                         pass
@@ -72,7 +72,7 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
         raise Exception("Отсутствуют остановки")
     DataToCalculate['busstops'] = busstops
     DataToCalculate['busstops_directions'] = busstops_directions
-    
+
     return DataToCalculate
 
 
@@ -80,8 +80,8 @@ def GetTravelTime(latitude: float, longitude: float) -> datetime:
     pass
 
 
-class PetriNET():
-    # Время входа или выхода пассажира (5 секунд наверное)
+class PetriNet():
+    passenger_time = 4  # Время входа или выхода пассажира (секунд)
 
     class Bus():
         pass
@@ -95,22 +95,46 @@ class PetriNET():
     class TimeLine():
         def __init__(self) -> None:
             self.timeline = []
-        
-        def add_data(datetime: datetime, data: dict):
+
+        def add_data(self, seconds_from_start: int, action: dict):
+            """
+            Функция работы с таймлайном
+
+            seconds_from_start - Количество секунд со старта расчёта
+            action - Данные в этот момент времени
+            """
             pass
 
-    def __init__(self) -> None:
+    def __init__(self, DataToCalculate: dict = {
+        'city_id': 3,
+        'routes': ['<Route: Единственный маршрут Актобе>'],
+        'busstops': '<QuerySet [<BusStop: ЖД Вокзал>, <BusStop: Акация>, <BusStop: Красснощекова>]>',
+        'busstops_directions': [{'busstop': '<BusStop: ЖД Вокзал>', 'directions': {...}},
+                                {'busstop': '<BusStop: Акация>', 'directions': {...}},
+                                {'busstop': '<BusStop: Красснощекова>', 'directions': {...}}],
+    }) -> None:
+        self.DataToCalculate = DataToCalculate
         self.timeline = self.TimeLine()
+        self.init_action()
+        print(self.passenger_time)
         # Начальное положение без автобусов (Список остановок с каждым человеком на ней (его id, начальное и конечное положение для отображения людей на остановках и в автобусе))
         # На карте остановки с пассажирами (в инокне остановки должно быть число пассажиров на ней а при popup показываться список пассажиров (брать динамически от текущего actions))
         # Идентичное поведение остановкам для автобусов
         # Если пассажир вышел на остановку с пересадкой отрисовать остановку
         # Наверное переделать Имитацию работы онлайн с 400мс. на относительную скорость движения между actions
 
+    def init_action(self):
+        action = {
+            "Bus": [],
+            "BusStop": []
+        }
 
+        # for
 
-def DataCalculation(DataToCalculate: dict) -> dict:
-    pass
+        self.timeline.add_data(0, action)
+
+    def Calculation(self):
+        return {"actions": []}
 
 # Не число шагов, а время
 

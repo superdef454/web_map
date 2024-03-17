@@ -7,7 +7,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from PetriNET.petri_net_utils import DataCalculation, GetDataToCalculate
+from PetriNET.petri_net_utils import GetDataToCalculate, PetriNet
 from PetriNET.utils import auth_required
 
 from .models import City, BusStop, Route
@@ -146,7 +146,7 @@ class Calculate(View):
             logger.info(f"Данные для расчёта: {DataToCalculate}")
 
         try:
-            calculate = DataCalculation(DataToCalculate)
+            calculate = PetriNet(DataToCalculate).Calculation()
         except Exception:
             logger.exception("Ошибка расчёта нагрузки")
             response.update(
