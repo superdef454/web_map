@@ -295,8 +295,12 @@
 
     // Функция проверки заполнения данных для расчёта
     function CheckDataToCalculateExists() {
-        if (RoutesForCalculate.length == 0 || Object.keys(BSPassengersDirections).length == 0) {
-            alert('Отсутствуют данные для расчёта!');
+        if (RoutesForCalculate.length == 0) {
+            alert('Не выбраны маршруты для расчёта!');
+            return false
+        }
+        if (Object.keys(BSPassengersDirections).length == 0) {
+            alert('Отсутствуют пассажиры на остановках!');
             return false
         }
         return true

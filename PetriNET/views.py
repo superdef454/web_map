@@ -156,7 +156,7 @@ class Calculate(View):
                 }
             )
             return JsonResponse(response)
-        
+
         response.update({
             'calculate': calculate
         })

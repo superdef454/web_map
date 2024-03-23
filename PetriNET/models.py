@@ -31,7 +31,7 @@ class TC(models.Model):
     name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250)
     # TODO Добавить поле изображения для визализации что это за транспорт
     capacity = models.SmallIntegerField(verbose_name="Вместимость")
-    description = models.TextField(verbose_name="Описание", null=True)
+    description = models.TextField(verbose_name="Описание", null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -42,7 +42,7 @@ class TC(models.Model):
 
 
 class BusStop(models.Model):
-    # Быть может one-to-one field к остановке напротив
+    # TODO one-to-one field к остановке напротив, также добавить в расчёт чтобы пассажир доезжал только до остановки напротив если она ближе
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE, db_index=True)
     name = models.CharField(verbose_name="Название остановки", max_length=250)
     latitude = models.FloatField(verbose_name="Широта", validators=[validate_latitude])
@@ -59,12 +59,16 @@ class BusStop(models.Model):
             models.Index(fields=['latitude', 'longitude'])
         ]
 
+    def get_routes_ids(self):
+        routes_ids = self.route_set.all().values_list('id', flat=True)
+        return routes_ids
+
 
 class Route(models.Model):
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название маршрута", max_length=250)
     tc = models.ForeignKey(TC, verbose_name="Тип транспортного средства", on_delete=models.SET_NULL, null=True)
-    interval = models.SmallIntegerField(verbose_name="Интервал движения", null=True)
+    interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", null=True)
     amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
     list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)  # Храним просчитанный путь
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
