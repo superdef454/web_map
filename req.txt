@@ -5,3 +5,4 @@ psycopg2==2.9.9
 sqlparse==0.4.3
 tzdata==2022.7
 fontawesomefree==6.5.1
+faker==24.4.0
