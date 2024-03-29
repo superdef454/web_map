@@ -853,6 +853,9 @@
                 DrawRoute(route);
             })
         }
+        else {
+            ShowAllRoutes()
+        }
     }
 
     // Обработка кнопки Сброс
@@ -929,9 +932,16 @@
         }
     }
 
+    // Данные для имитации работы онлайн
+    let simulation_data
+
+    // temp
+    let bus_marker
+
     // Функция разбора результатов расчёта
     function analysis_of_calculation_result(data_from_server) {
         if (data_from_server.error == 0) {
+            simulation_data = data_from_server
             let modal = $("#AnalysisOfCalculationResults");
             modal.modal('show')
         }
@@ -946,6 +956,9 @@
 
     // Имитировать работу онлайн
     function simulation() {
+        if (!simulation_data) {
+            return
+        }
         // Скрыть левую панель
         $("#left-panel").removeClass("d-flex");
         $("#left-panel").addClass("d-none");
@@ -955,7 +968,7 @@
 
 
         // Указать у StepsImitation количество step и max
-        let maxSteps = 200; // Установите здесь желаемое количество шагов
+        let maxSteps = simulation_data.calculate.length; // Установите здесь желаемое количество шагов
         $("#StepsImitation").attr("max", maxSteps);
         $("#LenStep").text(maxSteps);
         setRangeValue(1)
@@ -964,6 +977,14 @@
 
     // Функция для автоматического установления значения в input type="range"
     function setRangeValue(step) {
+        console.log(simulation_data.calculate[step - 1]);
+        if (simulation_data.calculate[step - 1][1].Bus.length > 0) {
+            var bus = simulation_data.calculate[step - 1][1].Bus[0]
+            if (bus_marker) {
+                bus_marker.remove()
+            }
+            bus_marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", opacity: 0.5 }).addTo(map)
+        }
         $("#StepsImitation").val(step);
         $("#StepNow").text(step);
     }

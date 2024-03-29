@@ -151,6 +151,7 @@ class PetriNet():
                 "bus_id": self.bus_id,
                 "route_id": self.route.pk,
                 "capacity": self.capacity,
+                "bus_stop_id": self.route_list[self.bus_stop_index_now]["bus_stop_id"],
                 "lat": self.route_list[self.bus_stop_index_now]["latitude"],
                 "lng": self.route_list[self.bus_stop_index_now]["longitude"],
                 "passengers": [pas.to_dict() for pas in self.passengers]
