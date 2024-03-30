@@ -653,6 +653,12 @@
         if (!CityExists()) {
             return
         }
+        if (RoutesForCalculate.length > 0) {
+            RouteLayer.clearLayers();
+            RoutesForCalculate.forEach((route, index) => {
+                DrawRoute(route);
+            })
+        }
         let modal = $("#ChoiceRouteForCalculate")
         let body = modal.find(".modal-body")
         SetChoiceRouteForCalculate()
