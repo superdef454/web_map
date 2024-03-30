@@ -68,9 +68,9 @@ class Route(models.Model):
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название маршрута", max_length=250)
     tc = models.ForeignKey(TC, verbose_name="Тип транспортного средства", on_delete=models.SET_NULL, null=True)
-    interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", null=True)
+    interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", default=5)
     amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
-    list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)  # Храним просчитанный путь
+    list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
 
     def __str__(self):

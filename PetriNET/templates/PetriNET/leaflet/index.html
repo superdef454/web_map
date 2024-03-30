@@ -951,7 +951,7 @@
     }
 
     // Глобальные переменные для имитации работы
-    let step_speed = 400
+    let step_speed = 800
     let timer = null
 
     // Имитировать работу онлайн
@@ -975,18 +975,48 @@
         setSingleStep(0)
     }
 
-    // Функция для автоматического установления значения в input type="range"
+    // Функция получения часов из секунд
+    function formatTime(seconds) {
+        var hours = Math.floor(seconds / 3600); // Получаем количество часов
+        var minutes = Math.floor((seconds % 3600) / 60); // Получаем количество минут
+        var seconds = seconds % 60; // Получаем оставшиеся секунды
+
+        // Добавляем ведущие нули, если необходимо
+        var hoursFormatted = hours.toString().padStart(2, '0');
+        var minutesFormatted = minutes.toString().padStart(2, '0');
+        var secondsFormatted = seconds.toString().padStart(2, '0');
+
+        // Собираем итоговую строку времени
+        return '(' + hoursFormatted + ':' + minutesFormatted + ':' + secondsFormatted + ')';
+    }
+
+
+    // Функция для автоматического установления значения в input type="range" и обновления данных симуляции (TODO вынести в отдельную функцию)
     function setRangeValue(step) {
-        console.log(simulation_data.calculate[step - 1]);
+        // console.log(simulation_data.calculate[step - 1]);
         if (simulation_data.calculate[step - 1][1].Bus.length > 0) {
             var bus = simulation_data.calculate[step - 1][1].Bus[0]
             if (bus_marker) {
                 bus_marker.remove()
             }
-            bus_marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", opacity: 0.5 }).addTo(map)
+            passengers_count = bus.passengers.length
+            // Создаем элемент div для нашей иконки
+            var iconElement = document.createElement('div');
+
+            iconElement.innerHTML = '<i class="fa-solid fa-location-pin fa-bounce fa-2xl" style="color: #3187cc;"></i>' + 
+                '<i class="fa-solid" style="top: 50%; left: 50%; background-color: white; border-radius: 10px; padding: 0 5px;">' + passengers_count + '</i>';
+
+            // Создаем иконку из HTML-элемента
+            var busIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: iconElement.innerHTML,
+                iconSize: [16, 42], // Размер вашей иконки
+                iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
+            });
+            bus_marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", icon: busIcon }).addTo(map)
         }
         $("#StepsImitation").val(step);
-        $("#StepNow").text(step);
+        $("#StepNow").text(step + ' - ' + formatTime(simulation_data.calculate[step - 1][0]));
     }
 
     // Увеличить шаг на single_step
@@ -1004,7 +1034,7 @@
     // Функция работы с step_speed
     function setSingleStep(step_diff) {
         if (step_diff == 0) {
-            step_speed = 400
+            step_speed = 800
         }
         else {
             step_speed -= step_diff
