@@ -291,7 +291,7 @@ class PetriNet():
                         "seconds_from_start": time,
                         "action": {
                             "Bus": [
-                                self.Bus(route, bus_id),
+                                self.Bus(route, bus_id + 1),
                             ]
                         }
                     })

@@ -941,8 +941,24 @@
     // Данные для имитации работы онлайн
     let simulation_data
 
-    // temp
-    let bus_marker
+    // Список автобусов
+    let bus_markers = []
+    // Список запущенных анимаций
+    let animation_list = []
+
+    function stop_all_animation() {
+        animation_list.forEach(animation => {
+            animation.stop()
+        })
+        animation_list = []
+    }
+
+    function clear_bus_markers() {
+        bus_markers.forEach(bus => {
+            bus.marker.remove()
+        })
+        bus_markers = []
+    }
 
     // Функция разбора результатов расчёта
     function analysis_of_calculation_result(data_from_server) {
@@ -997,30 +1013,66 @@
     }
 
 
+    // Функция отрисовки таймпоинта
+    function setStepAction(step) {
+        function marker_html(passengers_count) {
+            return '<i class="fa-solid fa-location-dot fa-bounce fa-2xl" style="color: #3187cc;"></i>' + 
+            '<i class="fa-solid" style="top: 50%; left: 50%; background-color: white; border-radius: 10px; padding: 0 5px;">' + passengers_count + '</i>';
+        }
+        stop_all_animation()
+        // Вместо этого хранить последнюю анимацию каждого автобуса в объекте автобуса, время анимации сделать временем до следующего таймпоинта (сколько он будет ехать)
+        // Всю имитацию перевести на секунды а не шаги, тогда всё должно быть плавнее и расчётливее
+        // Изменить цвет маршрутов
+        // Добавить остановкам и автобусам popup с пассажирами внутри
+        // Возможно автобусам рядом с кол-вом пассажиров номер маршрута для ясновсти
+        if (simulation_data.calculate[step - 1][1].Bus.length > 0) {
+            for (let bus_i = 0; bus_i < simulation_data.calculate[step - 1][1].Bus.length; bus_i++) {
+                const bus_action = simulation_data.calculate[step - 1][1].Bus[bus_i];
+                bus = bus_markers.find(bus => {if (bus.bus_id == bus_action.bus_id && bus.route_id == bus_action.route_id) return true})
+                if (!bus) {
+                    bus = {...bus_action}
+                    passengers_count = bus.passengers.length
+                    // Создаем элемент div для нашей иконки
+                    var iconElement = document.createElement('div');
+                    // Создаем иконку из HTML-элемента
+                    iconElement.innerHTML = marker_html(passengers_count)
+
+                    var busIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: iconElement.innerHTML,
+                        iconSize: [16, 42],
+                        iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
+                    });
+                    bus.marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", icon: busIcon }).addTo(map)
+                    bus_markers.push(bus)
+                }
+                else {
+                    if (bus_action.passengers.length != bus.length) {
+                        // Поменять число пассажирова автобуса
+                        new_passengers_count = bus_action.passengers.length
+                        var icon = bus.marker.getIcon()
+                        icon.options.html = marker_html(new_passengers_count)
+                        bus.marker.setLatLng([bus.lat, bus.lng])
+                        bus.marker.setIcon(icon);
+                    }
+                    if (bus_action.lat != bus.lat || bus_action.lng != bus.lng) {
+                        // Переместить автобус
+                        var pos_end = map.latLngToLayerPoint([bus_action.lat, bus_action.lng]);
+                        bus.lat = bus_action.lat
+                        bus.lng = bus_action.lng
+                        var new_animation = new L.PosAnimation()
+                        animation_list.push(new_animation)
+                        new_animation.run(bus.marker._icon, pos_end, 0.3);
+                    
+                    }
+                }
+            }
+        }
+    }
+
     // Функция для автоматического установления значения в input type="range" и обновления данных симуляции (TODO вынести в отдельную функцию)
     function setRangeValue(step) {
-        // console.log(simulation_data.calculate[step - 1]);
-        if (simulation_data.calculate[step - 1][1].Bus.length > 0) {
-            var bus = simulation_data.calculate[step - 1][1].Bus[0]
-            if (bus_marker) {
-                bus_marker.remove()
-            }
-            passengers_count = bus.passengers.length
-            // Создаем элемент div для нашей иконки
-            var iconElement = document.createElement('div');
-
-            iconElement.innerHTML = '<i class="fa-solid fa-location-pin fa-bounce fa-2xl" style="color: #3187cc;"></i>' + 
-                '<i class="fa-solid" style="top: 50%; left: 50%; background-color: white; border-radius: 10px; padding: 0 5px;">' + passengers_count + '</i>';
-
-            // Создаем иконку из HTML-элемента
-            var busIcon = L.divIcon({
-                className: 'custom-div-icon',
-                html: iconElement.innerHTML,
-                iconSize: [16, 42], // Размер вашей иконки
-                iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
-            });
-            bus_marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", icon: busIcon }).addTo(map)
-        }
+        setStepAction(step);
         $("#StepsImitation").val(step);
         $("#StepNow").text(step + ' - ' + formatTime(simulation_data.calculate[step - 1][0]));
     }
@@ -1050,8 +1102,7 @@
     }
 
     $("#StepsImitation").on("input", function() {
-        // Функция отрисовки текущего шага
-        $("#StepNow").text($(this).val());
+        setRangeValue($(this).val())
     });
 
     function Step() {
@@ -1074,6 +1125,9 @@
     // Закончить имитацию
     function end_simulation() {
         stopTimer()
+        stop_all_animation()
+        clear_bus_markers()
+        delete simulation_data
         // Скрыть нижнюю панель
         $("#bottom-panel").addClass("d-none");
         // Показать левую
