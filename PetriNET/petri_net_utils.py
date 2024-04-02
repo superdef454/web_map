@@ -7,6 +7,8 @@ logger = logging.getLogger('PetriNetManager')
 
 fake = Faker("ru_RU")
 
+MAX_PASSENGERS_COUNT_FOR_RESPONSE = 100
+
 
 def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     city_id = int(request_data_to_calculate['city_id'])
@@ -108,6 +110,11 @@ class PetriNet():
             self.passengers = []
             # Наверное сюда можно статистику добавить
 
+        @property
+        def get_rest_route(self) -> list[int]:
+            """Получение списка id оставшихся ОП до конечной"""
+            return [point['bus_stop_id'] for point in self.route_list[self.bus_stop_index_now:]]
+
         def serialize_route_point(self, point: list):
             # Удобное хранение данных маршрута
             bus_stop_id = 0
@@ -164,7 +171,8 @@ class PetriNet():
                 "bus_stop_id": self.route_list[self.bus_stop_index_now]["bus_stop_id"],
                 "lat": self.route_list[self.bus_stop_index_now]["latitude"],
                 "lng": self.route_list[self.bus_stop_index_now]["longitude"],
-                "passengers": [pas.to_dict() for pas in self.passengers]
+                "passengers": [pas.to_dict() for pas in self.passengers[0:MAX_PASSENGERS_COUNT_FOR_RESPONSE]],
+                "passengers_count": len(self.passengers)
             }
 
     class BusStop():
@@ -185,7 +193,8 @@ class PetriNet():
                 "id": self.bus_stop.pk,
                 "lat": self.bus_stop.latitude,
                 "lng": self.bus_stop.longitude,
-                "passengers": [pas.to_dict() for pas in self.passengers]
+                "passengers": [pas.to_dict() for pas in self.passengers[0:MAX_PASSENGERS_COUNT_FOR_RESPONSE]],
+                "passengers_count": len(self.passengers)
             }
 
     class Passenger():
@@ -353,8 +362,8 @@ class PetriNet():
                     self.timeline.add_data_to_response(this_seconds_from_start, bus.get_action())
                 # Заходят пассажиры, которые могут доехать до своей остановки
                 for pas in self.busstops[bus_stop_id_now].passengers.copy():
-                    # Если конечная точка пассажира есть в пути автобуса, и места в автобусе ещё есть
-                    if pas.end_bus_stop_id in bus.bus_stop_ids and len(bus.passengers) < bus.capacity:
+                    # Если конечная точка пассажира есть в оставшемся пути автобуса (до конечной), и места в автобусе ещё есть
+                    if pas.end_bus_stop_id in bus.get_rest_route and len(bus.passengers) < bus.capacity:
                         # Пассажир уходит с остановки
                         self.busstops[bus_stop_id_now].passengers.remove(pas)
                         # Садится в автобус

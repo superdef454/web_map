@@ -350,6 +350,7 @@
                 CloseAllAction();
                 return
             }
+            CloseAllAction();
             $(this).removeClass('btn-success btn-primary').addClass('btn-danger');
             $(this).text('x');
             ActionOnClick = 'AddTempMarker'
@@ -392,7 +393,7 @@
             }
             if (TempRouteList.length > 1 && (typeof TempRoute == "undefined" || TempRoute == null)) {
                 TempRoute = L.polyline(TempRouteList, {
-                    color: arrayRandElement(ListColour),
+                    // color: arrayRandElement(ListColour),
                     weight: 6,
                     fillOpacity: 0.2,
                 }).addTo(map);
@@ -535,7 +536,7 @@
     // Добавление маршрутов в группу маршрутов на карту
     function DrawRoute(route) {
         RouteLayer.addLayer(L.polyline(route.list_coord, {
-            color: arrayRandElement(ListColour),
+            // color: arrayRandElement(ListColour),
             weight: 6,
             fillOpacity: 0.2,
         }).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/route/${route.id}/change/"><p>${route.name}</p></a>`));
@@ -646,6 +647,8 @@
         else {
             body.html('<p>Маршрутов нет</p>')
         }
+        // Отрисовать только нужные маршруты
+        DrawRoutsForCalculate()
     }
 
     // Обработка кнопки Выбрать маршруты
@@ -853,6 +856,10 @@
                 RoutesForCalculate.splice(include, 1);
             }
         }
+        DrawRoutsForCalculate()
+    }
+
+    function DrawRoutsForCalculate() {
         if (RoutesForCalculate.length > 0) {
             RouteLayer.clearLayers();
             RoutesForCalculate.forEach((route, index) => {
@@ -870,7 +877,7 @@
         let modal = $("#ChoiceRouteForCalculate")
         let body = modal.find(".modal-body")
         body.html('')
-
+        CloseAllAction()
         RoutesForCalculate = []
         BSPassengersDirections = {}
         map.closePopup()
@@ -940,11 +947,9 @@
 
     // Данные для имитации работы онлайн
     let simulation_data
-
-    // Список автобусов
-    let bus_markers = []
-    // Список запущенных анимаций
-    let animation_list = []
+    let bus_markers = [] // Список автобусов
+    let bus_stop_markers = [] // Список остановок
+    let animation_list = [] // Список запущенных анимаций
 
     function stop_all_animation() {
         animation_list.forEach(animation => {
@@ -958,6 +963,21 @@
             bus.marker.remove()
         })
         bus_markers = []
+    }
+
+    function clear_bus_stop_markers() {
+        bus_stop_markers.forEach(bus_stop => {
+            bus_stop.marker.remove()
+        })
+        bus_stop_markers = []
+    }
+
+    function clear_data_for_simulation() {
+        // Остановить таймер
+        stopTimer()
+        stop_all_animation()
+        clear_bus_markers()
+        clear_bus_stop_markers()
     }
 
     // Функция разбора результатов расчёта
@@ -986,9 +1006,8 @@
         $("#left-panel").addClass("d-none");
         // Показать нижнюю
         $("#bottom-panel").removeClass("d-none");
-        // Очистить карту
-
-
+        // Очистить карту от старых ОП
+        BusStops.clearLayers();
         // Указать у StepsImitation количество step и max
         let maxSteps = simulation_data.calculate.length; // Установите здесь желаемое количество шагов
         $("#StepsImitation").attr("max", maxSteps);
@@ -1015,9 +1034,21 @@
 
     // Функция отрисовки таймпоинта
     function setStepAction(step) {
-        function marker_html(passengers_count) {
-            return '<i class="fa-solid fa-location-dot fa-bounce fa-2xl" style="color: #3187cc;"></i>' + 
-            '<i class="fa-solid" style="top: 50%; left: 50%; background-color: white; border-radius: 10px; padding: 0 5px;">' + passengers_count + '</i>';
+        function bus_stop_marker_html(passengers_count) {
+            return `
+            <div style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
+            <i class="fa-solid fa-location-dot fa-bounce fa-2xl" style="color: #3187cc;"></i>
+            <i class="fa-solid" style="background-color: white; border-radius: 10px; margin-top: 12px;">${passengers_count}</i>
+            </div>
+            `;
+        }
+        function bus_marker_html(passengers_count) {
+            return `
+            <div style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
+            <i class="fa-solid fa-bus fa-xl"></i>
+            <i class="fa-solid" style="background-color: white; border-radius: 10px; margin-top: 10px;">${passengers_count}</i>
+            </div>
+            `;
         }
         stop_all_animation()
         // Вместо этого хранить последнюю анимацию каждого автобуса в объекте автобуса, время анимации сделать временем до следующего таймпоинта (сколько он будет ехать)
@@ -1025,17 +1056,17 @@
         // Изменить цвет маршрутов
         // Добавить остановкам и автобусам popup с пассажирами внутри
         // Возможно автобусам рядом с кол-вом пассажиров номер маршрута для ясновсти
+        // console.log(simulation_data.calculate[step - 1]);
         if (simulation_data.calculate[step - 1][1].Bus.length > 0) {
             for (let bus_i = 0; bus_i < simulation_data.calculate[step - 1][1].Bus.length; bus_i++) {
                 const bus_action = simulation_data.calculate[step - 1][1].Bus[bus_i];
-                bus = bus_markers.find(bus => {if (bus.bus_id == bus_action.bus_id && bus.route_id == bus_action.route_id) return true})
+                bus = bus_markers.find(bus => bus.bus_id == bus_action.bus_id && bus.route_id == bus_action.route_id)
                 if (!bus) {
                     bus = {...bus_action}
-                    passengers_count = bus.passengers.length
                     // Создаем элемент div для нашей иконки
                     var iconElement = document.createElement('div');
                     // Создаем иконку из HTML-элемента
-                    iconElement.innerHTML = marker_html(passengers_count)
+                    iconElement.innerHTML = bus_marker_html(bus.passengers_count)
 
                     var busIcon = L.divIcon({
                         className: 'custom-div-icon',
@@ -1047,11 +1078,11 @@
                     bus_markers.push(bus)
                 }
                 else {
-                    if (bus_action.passengers.length != bus.length) {
-                        // Поменять число пассажирова автобуса
-                        new_passengers_count = bus_action.passengers.length
+                    if (bus_action.passengers_count != bus.passengers_count) {
+                        // Поменять число пассажиров автобуса
+                        bus.passengers_count = bus_action.passengers_count
                         var icon = bus.marker.getIcon()
-                        icon.options.html = marker_html(new_passengers_count)
+                        icon.options.html = bus_marker_html(bus.passengers_count)
                         bus.marker.setLatLng([bus.lat, bus.lng])
                         bus.marker.setIcon(icon);
                     }
@@ -1068,6 +1099,46 @@
                 }
             }
         }
+        for (let bus_stop_i = 0; bus_stop_i < simulation_data.calculate[step - 1][1].BusStops.length; bus_stop_i++) {
+            const bus_stop_action = simulation_data.calculate[step - 1][1].BusStops[bus_stop_i];
+            bus_stop = bus_stop_markers.find(bus_stop => bus_stop.id == bus_stop_action.id)
+            if (!bus_stop) {
+                bus_stop = {...bus_stop_action}
+                // Создаем элемент div для нашей иконки
+                var iconElement = document.createElement('div');
+                // Создаем иконку из HTML-элемента
+                iconElement.innerHTML = bus_stop_marker_html(bus_stop.passengers_count)
+
+                var bus_stop_icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: iconElement.innerHTML,
+                    iconSize: [16, 42],
+                    iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
+                    // Возможно стоит сделать чуть правее, чтобы автобус не переграждал
+                });
+                bus_stop.marker = L.marker([bus_stop.lat, bus_stop.lng], { alt: "Автобус", icon: bus_stop_icon }).addTo(map)
+                BusStops.addLayer(bus_stop.marker)
+                bus_stop_markers.push(bus_stop)
+            }
+            else {
+                if (bus_stop_action.passengers_count != bus_stop.passengers_count) {
+                    // Поменять число пассажиров остановки
+                    bus_stop.passengers_count = bus_stop_action.passengers_count
+                    var icon = bus_stop.marker.getIcon()
+                    icon.options.html = bus_stop_marker_html(bus_stop.passengers_count)
+                    bus_stop.marker.setIcon(icon);
+                }
+            }
+        }
+        bus_stop_markers.forEach(bus_stop => {
+            if (!simulation_data.calculate[step - 1][1].BusStops.find(bus_stop_in_action => bus_stop.id == bus_stop_in_action.id)) {
+                bus_stop.passengers = []
+                bus_stop.passengers_count = 0
+                var icon = bus_stop.marker.getIcon()
+                icon.options.html = bus_stop_marker_html(bus_stop.passengers_count)
+                bus_stop.marker.setIcon(icon);
+            }
+        })
     }
 
     // Функция для автоматического установления значения в input type="range" и обновления данных симуляции (TODO вынести в отдельную функцию)
@@ -1124,9 +1195,9 @@
 
     // Закончить имитацию
     function end_simulation() {
-        stopTimer()
-        stop_all_animation()
-        clear_bus_markers()
+        // Очищаем данные симуляции
+        clear_data_for_simulation()
+        
         delete simulation_data
         // Скрыть нижнюю панель
         $("#bottom-panel").addClass("d-none");
@@ -1134,6 +1205,9 @@
         $("#left-panel").removeClass("d-none");
         $("#left-panel").addClass("d-flex");
         // Вернуть данные на карту
+        CityID = CurrentCity.id
+        CurrentCity = null
+        ChoiceCity(CityID)
     }
 
     $(document).ready(function() {
