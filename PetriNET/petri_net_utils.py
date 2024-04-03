@@ -1,7 +1,8 @@
+import datetime
 import logging
 import random
 from faker import Faker
-from .models import BusStop, Route
+from .models import BusStop, City, Route
 
 logger = logging.getLogger('PetriNetManager')
 
@@ -38,7 +39,7 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     busstops = BusStop.objects.filter(
         city_id=city_id,
         route__id__in=[route.id for route in routes]
-    )
+    ).prefetch_related('route_set')
 
     for busstop in busstops:
         try:
@@ -405,5 +406,47 @@ class PetriNet():
                     self.timeline.add_timepoint(this_seconds_from_start + time_delta, bus.get_action())
             this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
         return self.timeline.data_to_response
+
+    def CreateDataToReport(self) -> dict:
+        """Собирает данные для отчёта"""
+        data_to_report = {}
+        data_to_report['city_name'] = City.objects.get(id=self.data_to_calculate['city_id']).name
+        data_to_report['data'] = str(datetime.datetime.now().date())
+        data_to_report['route_ids'] = [route.id for route in self.routes]
+        data_to_report['bus_stops'] = []
+        for bus_stop in self.data_to_calculate['busstops']:
+            bus_add = {}
+            for bus_in_calculate in self.timeline.data_to_response[0][1]['BusStops']:
+                if bus_in_calculate['id'] == bus_stop.id:
+                    bus_add['bus_name'] = bus_stop.name
+                    bus_add['passengers_count'] = bus_in_calculate['passengers_count']
+                    break
+            if bus_add:
+                for timepoint in self.timeline.data_to_response:
+                    for bus_in_calculate in timepoint[1]['BusStops']:
+                        if bus_in_calculate['id'] == bus_stop.id:
+                            bus_add['max_waiting_time'] = timepoint[0]
+                            break
+                    else:
+                        break
+                bus_add['routes_count'] = len(bus_stop.route_set.all())
+                data_to_report['bus_stops'].append(bus_add)
+        results_add = {
+            'bus_name': 'Итоги',
+            'passengers_count': 0,
+            'max_waiting_time': [],
+            'routes_count': ''
+        }
+        for bus_stop in data_to_report['bus_stops']:
+            results_add['passengers_count'] += bus_stop['passengers_count']
+            results_add['max_waiting_time'].append(bus_stop['max_waiting_time'])
+        # Среднее время ожидания
+        results_add['max_waiting_time'] = int(sum(results_add['max_waiting_time']) / len(results_add['max_waiting_time']))
+        # Формировать цвет время ожидания автобуса относительно среднего
+        # bus_add['color'] = 'white'
+        data_to_report['routes'] = []
+        for route in self.data_to_calculate['routes']:
+            pass
+        return data_to_report
 
 # Проверка что на маршруте 2 и более остановок

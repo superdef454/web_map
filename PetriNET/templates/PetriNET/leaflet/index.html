@@ -202,7 +202,7 @@
                 </button>
             </div>
             <div class="modal-body text-center">
-                <button class="btn btn-primary" type="button">Показать отчёт</button>
+                <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт</button>
                 <button class="btn btn-primary" data-dismiss="modal" type="button" onclick="simulation()">Имитировать работу онлайн</button>
             </div>
         </div>
@@ -393,7 +393,7 @@
             }
             if (TempRouteList.length > 1 && (typeof TempRoute == "undefined" || TempRoute == null)) {
                 TempRoute = L.polyline(TempRouteList, {
-                    // color: arrayRandElement(ListColour),
+                    // color: arrayRandElement(ListColor),
                     weight: 6,
                     fillOpacity: 0.2,
                 }).addTo(map);
@@ -536,7 +536,7 @@
     // Добавление маршрутов в группу маршрутов на карту
     function DrawRoute(route) {
         RouteLayer.addLayer(L.polyline(route.list_coord, {
-            // color: arrayRandElement(ListColour),
+            // color: arrayRandElement(ListColor),
             weight: 6,
             fillOpacity: 0.2,
         }).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/route/${route.id}/change/"><p>${route.name}</p></a>`));
@@ -956,6 +956,9 @@
             animation.stop()
         })
         animation_list = []
+        bus_markers.forEach(bus => {
+            bus.marker.setLatLng([bus.lat, bus.lng])
+        })
     }
 
     function clear_bus_markers() {
@@ -1001,6 +1004,7 @@
         if (!simulation_data) {
             return
         }
+        DrawRoutsForCalculate()
         // Скрыть левую панель
         $("#left-panel").removeClass("d-flex");
         $("#left-panel").addClass("d-none");
@@ -1050,7 +1054,6 @@
             </div>
             `;
         }
-        stop_all_animation()
         // Вместо этого хранить последнюю анимацию каждого автобуса в объекте автобуса, время анимации сделать временем до следующего таймпоинта (сколько он будет ехать)
         // Всю имитацию перевести на секунды а не шаги, тогда всё должно быть плавнее и расчётливее
         // Изменить цвет маршрутов
@@ -1143,6 +1146,7 @@
 
     // Функция для автоматического установления значения в input type="range" и обновления данных симуляции (TODO вынести в отдельную функцию)
     function setRangeValue(step) {
+        stop_all_animation()
         setStepAction(step);
         $("#StepsImitation").val(step);
         $("#StepNow").text(step + ' - ' + formatTime(simulation_data.calculate[step - 1][0]));
@@ -1154,6 +1158,7 @@
         maxSteps = parseInt($("#StepsImitation").attr("max"), 10)
         if (step >= maxSteps) {
             stopTimer()
+            stop_all_animation()
             return
         }
         step += 1
@@ -1210,11 +1215,11 @@
         ChoiceCity(CityID)
     }
 
-    $(document).ready(function() {
-        // simulation()  // TODO Убрать
-    })
+    function DownloadReport() {
 
-    ListColour = [
+    }
+
+    ListColor = [
         "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"
     ]
     function arrayRandElement(arr) {

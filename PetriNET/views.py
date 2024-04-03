@@ -146,7 +146,9 @@ class Calculate(View):
             logger.info(f"Данные для расчёта: {DataToCalculate}")
 
         try:
-            calculate = PetriNet(DataToCalculate).Calculation()
+            petri_net = PetriNet(DataToCalculate)
+            calculate = petri_net.Calculation()
+            data_to_report = petri_net.CreateDataToReport()
         except Exception:
             logger.exception("Ошибка расчёта нагрузки")
             response.update(
@@ -158,7 +160,8 @@ class Calculate(View):
             return JsonResponse(response)
 
         response.update({
-            'calculate': calculate
+            'calculate': calculate,
+            'data_to_report': data_to_report,
         })
 
         return JsonResponse(response)
