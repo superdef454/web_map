@@ -562,6 +562,34 @@
         $("#BusStopAdd").text('+');
     }
 
+    function UpdateCityData() {
+        if (!CurrentCity) {
+                return
+            }
+        BusStops.clearLayers();
+        RouteLayer.clearLayers();
+        Routes = [];
+        const csrftoken = getCookie('csrftoken');
+        $.ajax({
+            url: '{% url "PetriNET:get_city_data" %}',
+            method: 'get',
+            dataType: 'html',
+            headers: { 'X-CSRFToken': csrftoken },
+            data: {
+                city_id: CurrentCity.id,
+            },
+            success: function (data) {
+                JSON.parse(data).BSList.forEach(BS => {
+                    AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
+                });
+                JSON.parse(data).RouteList.forEach(Route => {
+                    CreateRoute(Route.list_coord, Route.id, Route.name)
+                });
+                $("#RouteAll").click();
+            }
+        });
+    }
+
     // Выбор города, запрос к бд для получения данных города и его маршрутов
     function ChoiceCity(id) {
         let CityID = id
@@ -574,30 +602,9 @@
             if (CurrentCity) {
                 Reset()
             }
-            BusStops.clearLayers();
-            RouteLayer.clearLayers();
-            Routes = [];
             CurrentCity = City;
             $("#dropdownMenuButton").text(City.name);
-            const csrftoken = getCookie('csrftoken');
-            $.ajax({
-                url: '{% url "PetriNET:get_city_data" %}',
-                method: 'get',
-                dataType: 'html',
-                headers: { 'X-CSRFToken': csrftoken },
-                data: {
-                    city_id: CurrentCity.id,
-                },
-                success: function (data) {
-                    JSON.parse(data).BSList.forEach(BS => {
-                        AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
-                    });
-                    JSON.parse(data).RouteList.forEach(Route => {
-                        CreateRoute(Route.list_coord, Route.id, Route.name)
-                    });
-                    $("#RouteAll").click();
-                }
-            });
+            UpdateCityData()
         }
     }
 
@@ -1202,7 +1209,6 @@
     function end_simulation() {
         // Очищаем данные симуляции
         clear_data_for_simulation()
-        
         delete simulation_data
         // Скрыть нижнюю панель
         $("#bottom-panel").addClass("d-none");
@@ -1210,9 +1216,8 @@
         $("#left-panel").removeClass("d-none");
         $("#left-panel").addClass("d-flex");
         // Вернуть данные на карту
-        CityID = CurrentCity.id
-        CurrentCity = null
-        ChoiceCity(CityID)
+        UpdateCityData()
+        DrawRoutsForCalculate()
     }
 
     function DownloadReport() {

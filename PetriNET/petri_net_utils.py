@@ -1,6 +1,7 @@
 import datetime
 import logging
 import random
+from geopy import distance
 from faker import Faker
 from .models import BusStop, City, Route
 
@@ -87,8 +88,13 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
 def GetTravelTime(latitude_start: float, longitude_start: float,
                   latitude_end: float, longitude_end: float) -> int:
     # Написать функцию получения времени, за которое автобус проедет расстояние между остановками в секундах
-    # Можно найти растояние между двумя остановками с помощью geopy.distance
     return 60 * 3
+
+
+def GetTravelRange(latitude_start: float, longitude_start: float,
+                   latitude_end: float, longitude_end: float) -> int:
+    """Нахождение расстояния между координатами в км"""
+    return distance.distance((latitude_start, longitude_start), (latitude_end, longitude_end)).km
 
 
 class PetriNet():
@@ -114,6 +120,10 @@ class PetriNet():
         @property
         def get_rest_route(self) -> list[int]:
             """Получение списка id оставшихся ОП до конечной"""
+            if self.ending_station():
+                route_list = self.route_list.copy()
+                route_list.reverse()
+                return [point['bus_stop_id'] for point in route_list[0:]]
             return [point['bus_stop_id'] for point in self.route_list[self.bus_stop_index_now:]]
 
         def serialize_route_point(self, point: list):
@@ -205,6 +215,14 @@ class PetriNet():
             self.start_bus_stop_id = start_point
             self.end_bus_stop_id = end_point
 
+        def get_route_count(self, bus_stop_ids: list[int]) -> int:
+            """Получение длительности пути пассажира (кол-ва остановок)"""
+            start_index = bus_stop_ids.index(self.start_bus_stop_id)
+            end_index = bus_stop_ids.index(self.end_bus_stop_id)
+            if start_index >= end_index:
+                raise Exception("Неправильное получение длительности пути пассажира")
+            return end_index - start_index
+
         def to_dict(self) -> dict:
             """Получение данных для отображения на сайте"""
             return {
@@ -280,6 +298,10 @@ class PetriNet():
     def __init__(self, data_to_calculate: dict = {}) -> None:
         self.data_to_calculate = data_to_calculate
         self.routes = data_to_calculate['routes']
+        self.data_to_report = {'routes': {route.id: {'route': route,
+                                                     'average_passengers_stops_count': [0, 0],
+                                                     'average_fullness': [0, 0],
+                                                     } for route in self.routes}}
         # Список объектов остановок с пассажирами
         self.busstops = {}
         self.busstops_cached = {busstop.id: busstop for busstop in data_to_calculate['busstops']}
@@ -363,12 +385,17 @@ class PetriNet():
                     self.timeline.add_data_to_response(this_seconds_from_start, bus.get_action())
                 # Заходят пассажиры, которые могут доехать до своей остановки
                 for pas in self.busstops[bus_stop_id_now].passengers.copy():
-                    # Если конечная точка пассажира есть в оставшемся пути автобуса (до конечной), и места в автобусе ещё есть
+                    # Если конечная точка пассажира есть в оставшемся пути автобуса (до конечной),
+                    # и места в автобусе ещё есть
                     if pas.end_bus_stop_id in bus.get_rest_route and len(bus.passengers) < bus.capacity:
                         # Пассажир уходит с остановки
                         self.busstops[bus_stop_id_now].passengers.remove(pas)
                         # Садится в автобус
                         bus.passengers.append(pas)
+                        # Считается средняя длительность пути пассажиров
+                        self.data_to_report['routes'][bus.route.id]['average_passengers_stops_count'][0] +=\
+                            pas.get_route_count(bus.get_rest_route)
+                        self.data_to_report['routes'][bus.route.id]['average_passengers_stops_count'][1] += 1
                         # Это занимает некоторое время
                         time_delta += self.passenger_time
                 # Добавить таймпоинт после посадки людей
@@ -399,6 +426,9 @@ class PetriNet():
                         self.busstops[bus_stop_id_now].set_last_start_bus_time(bus.route.id, this_seconds_from_start)
                         # Добавляем время пути до следующей остановки
                         time_delta += bus.get_travel_time()
+                        # Считаем среднюю наполненность
+                        self.data_to_report['routes'][bus.route.id]['average_fullness'][0] += len(bus.passengers)
+                        self.data_to_report['routes'][bus.route.id]['average_fullness'][1] += 1
                         # Передвигаем автобус
                         bus.drive_to_next_bus_stop()
                     this_action["Bus"].remove(bus)
@@ -412,7 +442,6 @@ class PetriNet():
         data_to_report = {}
         data_to_report['city_name'] = City.objects.get(id=self.data_to_calculate['city_id']).name
         data_to_report['data'] = str(datetime.datetime.now().date())
-        data_to_report['route_ids'] = [route.id for route in self.routes]
         data_to_report['bus_stops'] = []
         for bus_stop in self.data_to_calculate['busstops']:
             bus_add = {}
@@ -429,6 +458,7 @@ class PetriNet():
                             break
                     else:
                         break
+                bus_add['max_waiting_time'] = int(bus_add['max_waiting_time'] / 60)
                 bus_add['routes_count'] = len(bus_stop.route_set.all())
                 data_to_report['bus_stops'].append(bus_add)
         results_add = {
@@ -441,12 +471,40 @@ class PetriNet():
             results_add['passengers_count'] += bus_stop['passengers_count']
             results_add['max_waiting_time'].append(bus_stop['max_waiting_time'])
         # Среднее время ожидания
-        results_add['max_waiting_time'] = int(sum(results_add['max_waiting_time']) / len(results_add['max_waiting_time']))
+        results_add['max_waiting_time'] = int(sum(results_add['max_waiting_time']) /
+                                              len(results_add['max_waiting_time']))
+        data_to_report['bus_stops'].append(results_add)
         # Формировать цвет время ожидания автобуса относительно среднего
         # bus_add['color'] = 'white'
         data_to_report['routes'] = []
-        for route in self.data_to_calculate['routes']:
-            pass
+        for route in self.data_to_report['routes'].values():
+            add_route = route.copy()
+            add_route.pop('route')
+            add_route['name'] = route['route'].name
+            TC = route['route'].tc
+            add_route['TC'] = f'{TC.name}, {TC.capacity}' if TC else ''
+            add_route['interval'] = route['route'].interval
+            add_route['average_passengers_stops_count'] = round(route['average_passengers_stops_count'][0] /
+                                                                route['average_passengers_stops_count'][1], 2)
+            add_route['average_fullness'] = str(round((route['average_fullness'][0] /
+                                                       route['average_fullness'][1] /
+                                                       TC.capacity) * 100, 2)) + '%'
+            add_route['bus_stop_count'] = len(route['route'].busstop.all())
+            add_route['route_length'] = 0
+            last_bus_stop = None
+            for now_bus_stop in route['route'].busstop.all():
+                if not last_bus_stop:
+                    last_bus_stop = now_bus_stop
+                    continue
+                add_route['route_length'] += GetTravelRange(
+                    last_bus_stop.latitude,
+                    last_bus_stop.longitude,
+                    now_bus_stop.latitude,
+                    now_bus_stop.longitude,
+                    )
+            add_route['route_length'] = round(add_route['route_length'], 2)
+            add_route['TC_count'] = TC.capacity
+            data_to_report['routes'].append(add_route)
         return data_to_report
 
 # Проверка что на маршруте 2 и более остановок
