@@ -3,6 +3,12 @@
 from django.db import migrations, models
 
 
+def CreateFirstCity(apps, schema_editor):
+    City = apps.get_model('PetriNET', 'City')
+    City.objects.create(region=56, name='Оренбург', latitude=51.7727, longitude=55.0988)
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -20,4 +26,5 @@ class Migration(migrations.Migration):
             name='description',
             field=models.TextField(blank=True, null=True, verbose_name='Описание'),
         ),
+        migrations.RunPython(CreateFirstCity, reverse_code=lambda apps, schema_editor: None)
     ]

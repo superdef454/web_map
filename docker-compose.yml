@@ -1,5 +1,15 @@
 version: '3.8'
 services:
+
+  postgre:
+    image: postgres:16.2-alpine
+    environment:
+      - POSTGRES_DB=OptiMoVe
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+
   optimove:
     build: 
       context: .
@@ -19,13 +29,3 @@ services:
     depends_on:
       postgre:
         condition: service_healthy
-
-  postgre:
-    image: postgres:16.2-alpine
-    environment:
-      - POSTGRES_DB=OptiMoVe
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
-

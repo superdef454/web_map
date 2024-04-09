@@ -438,6 +438,7 @@ class PetriNet():
                     # Добавляем следующий таймпоинт в таймлайн
                     self.timeline.add_timepoint(this_seconds_from_start + time_delta, bus.get_action())
             this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
+        self.timeline.data_to_response.sort(key=lambda i: i[0])
         return self.timeline.data_to_response
 
     def CreateDataToReport(self) -> dict:
