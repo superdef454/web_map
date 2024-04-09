@@ -1,6 +1,9 @@
 import datetime
 import logging
+import os
 import random
+from docx import Document
+from docx.shared import Pt
 from geopy import distance
 from faker import Faker
 from .models import BusStop, City, Route
@@ -40,7 +43,7 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     busstops = BusStop.objects.filter(
         city_id=city_id,
         route__id__in=[route.id for route in routes]
-    ).prefetch_related('route_set')
+    ).prefetch_related('route_set').distinct()
 
     for busstop in busstops:
         try:
@@ -54,7 +57,7 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
                 }
             }
             valid_bus_stops = BusStop.objects.filter(
-                route__id__in=busstop.get_routes_ids()).values_list('id', flat=True)  # Пока делаем без пересадок
+                route__id__in=busstop.get_routes_ids()).values_list('id', flat=True).distinct()  # Пока делаем без пересадок
             busstop_from_request = request_data_to_calculate['busstops'].pop(str(busstop.id), None)
             if busstop_from_request:
                 PassengersWithoutDirection = int(busstop_from_request.get('PWD', 0))
@@ -336,7 +339,7 @@ class PetriNet():
             bus_stop = self.busstops_cached[busstops_direction['busstop']]
             valid_bus_stops = list(BusStop.objects.filter(
                 route__id__in=bus_stop.get_routes_ids(),
-                id__in=list(self.busstops_cached.keys())).values_list('id', flat=True))
+                id__in=list(self.busstops_cached.keys())).values_list('id', flat=True).distinct())
             if busstops_direction['busstop'] in valid_bus_stops:
                 valid_bus_stops.remove(busstops_direction['busstop'])
             passengers = []
@@ -441,7 +444,7 @@ class PetriNet():
         """Собирает данные для отчёта"""
         data_to_report = {}
         data_to_report['city_name'] = City.objects.get(id=self.data_to_calculate['city_id']).name
-        data_to_report['data'] = str(datetime.datetime.now().date())
+        data_to_report['data'] = str(datetime.datetime.now().isoformat(sep='_', timespec='seconds'))
         data_to_report['bus_stops'] = []
         for bus_stop in self.data_to_calculate['busstops']:
             bus_add = {}
@@ -485,10 +488,10 @@ class PetriNet():
             add_route['TC'] = f'{TC.name}, {TC.capacity}' if TC else ''
             add_route['interval'] = route['route'].interval
             add_route['average_passengers_stops_count'] = round(route['average_passengers_stops_count'][0] /
-                                                                route['average_passengers_stops_count'][1], 2)
+                                                                (route['average_passengers_stops_count'][1] or 1), 2)
             add_route['average_fullness'] = str(round((route['average_fullness'][0] /
-                                                       route['average_fullness'][1] /
-                                                       TC.capacity) * 100, 2)) + '%'
+                                                       (route['average_fullness'][1] or 1) /
+                                                       (TC.capacity or 1)) * 100, 2)) + '%'
             add_route['bus_stop_count'] = len(route['route'].busstop.all())
             add_route['route_length'] = 0
             last_bus_stop = None
@@ -503,8 +506,83 @@ class PetriNet():
                     now_bus_stop.longitude,
                     )
             add_route['route_length'] = round(add_route['route_length'], 2)
-            add_route['TC_count'] = TC.capacity
+            add_route['TC_count'] = route['route'].amount
             data_to_report['routes'].append(add_route)
         return data_to_report
+
+
+def CreateResponseFile(data_to_report: dict) -> str:
+    city_name = data_to_report.get('city_name', '')
+    date = data_to_report.get('data', '')
+
+    path = 'media/reports/'
+    file_name = f'report_{city_name}_{date}.docx'
+    file_path = path + file_name
+    if os.path.isfile(file_path):
+        return file_path
+
+    # Создаем новый документ Word
+    doc = Document()
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(14)
+
+    bus_stops = data_to_report.get('bus_stops', [])
+    routes = data_to_report.get('routes', [])
+
+    # Добавляем заголовок
+    doc.add_paragraph(f'Результат расчёта нагрузки на транспортную сеть с использованием маршрутов: {", ".join([route["name"] for route in routes])} \n')
+
+    doc.add_paragraph(f"Населённый пункт: {city_name}")
+    doc.add_paragraph(f"Дата: {date}\n")
+
+    # Добавляем таблицу автобусных остановок
+    if bus_stops:
+        doc.add_paragraph('Автобусные остановки:')
+        table = doc.add_table(rows=1, cols=4)
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Остановка'
+        hdr_cells[1].text = 'Количество пассажиров'
+        hdr_cells[2].text = 'Максимальное время ожидания автобуса, мин.'
+        hdr_cells[3].text = 'Количество маршрутов, шт.'
+
+        for stop in bus_stops:
+            row_cells = table.add_row().cells
+            row_cells[0].text = stop.get('bus_name', '')
+            row_cells[1].text = str(stop.get('passengers_count', ''))
+            row_cells[2].text = str(stop.get('max_waiting_time', ''))
+            row_cells[3].text = str(stop.get('routes_count', ''))
+
+    # Добавляем таблицу маршрутов
+    if routes:
+        doc.add_paragraph('\nМаршруты:')
+        table = doc.add_table(rows=1, cols=8)
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Маршрут'
+        hdr_cells[1].text = 'Тип транспортного средства, Название, вместимость'
+        hdr_cells[2].text = 'Интервал движения автобусов, мин.'
+        hdr_cells[3].text = 'Средняя длительность пути пассажиров, кол-во ОП'
+        hdr_cells[4].text = 'Средняя наполненность автобусов, %'
+        hdr_cells[5].text = 'Количество остановок'
+        hdr_cells[6].text = 'Протяжённость'
+        hdr_cells[7].text = 'Кол-во автобусов на маршруте'
+
+        for route in routes:
+            row_cells = table.add_row().cells
+            row_cells[0].text = route.get('name', '')
+            row_cells[1].text = route.get('TC', '')
+            row_cells[2].text = str(route.get('interval', ''))
+            row_cells[3].text = str(route.get('average_passengers_stops_count', ''))
+            row_cells[4].text = route.get('average_fullness', '')
+            row_cells[5].text = str(route.get('bus_stop_count', ''))
+            row_cells[6].text = str(route.get('route_length', ''))
+            row_cells[7].text = str(route.get('TC_count', ''))
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+    # Сохраняем файл локально на сервере
+    doc.save(file_path)
+
+    return file_path
 
 # Проверка что на маршруте 2 и более остановок

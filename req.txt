@@ -7,3 +7,4 @@ tzdata==2022.7
 fontawesomefree==6.5.1
 faker==24.4.0
 geopy==2.4.1
+python-docx==1.1.0

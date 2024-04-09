@@ -7,7 +7,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from PetriNET.petri_net_utils import GetDataToCalculate, PetriNet
+from PetriNET.petri_net_utils import CreateResponseFile, GetDataToCalculate, PetriNet
 from PetriNET.utils import auth_required
 
 from .models import City, BusStop, Route
@@ -165,3 +165,15 @@ class Calculate(View):
         })
 
         return JsonResponse(response)
+
+
+def download_report_file(request):
+    data_to_report = json.loads(request.POST.get('data_to_report'))
+    file_path = ""
+    try:
+        file_path = CreateResponseFile(data_to_report)
+    except Exception:
+        logger.exception('Ошибка формирования файла отчёта')
+    # Возвращаем URL для скачивания файла
+    download_url = request.build_absolute_uri('/') + file_path
+    return JsonResponse({'download_url': download_url})

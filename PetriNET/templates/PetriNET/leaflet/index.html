@@ -148,7 +148,9 @@
                             <button type="button" class="btn btn-danger" onclick="stopTimer()"><i class="fas fa-pause"></i></button>
                         </div>
                     </div>
-                    <div class="col">
+                    <div class="col" style="text-align: right;">
+                        <!-- Скачать отчёт -->
+                        <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт <i class="fa-solid fa-download"></i></button>
                     </div>
                 </div>
             </div>
@@ -202,7 +204,7 @@
                 </button>
             </div>
             <div class="modal-body text-center">
-                <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт</button>
+                <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт <i class="fa-solid fa-download"></i></button>
                 <button class="btn btn-primary" data-dismiss="modal" type="button" onclick="simulation()">Имитировать работу онлайн</button>
             </div>
         </div>
@@ -1221,7 +1223,32 @@
     }
 
     function DownloadReport() {
-
+        if (!simulation_data) {
+            alert('Отсутствуют данные для отчёта!')
+            return
+        }
+        const csrftoken = getCookie('csrftoken');
+        $.ajax({
+            url: '{% url "PetriNET:download_report_file" %}',
+            method: 'post',
+            dataType: 'html',
+            headers: { 'X-CSRFToken': csrftoken },
+            data: {
+                "data_to_report": JSON.stringify(simulation_data.data_to_report),
+            },
+            success: function (response) {
+                // Создаём временную ссылку для скачивания файла
+                const link = document.createElement('a');
+                link.href = JSON.parse(response).download_url;
+                link.setAttribute('download', ''); // Необходимо для некоторых браузеров
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            },
+            error: function (jqXHR, exception) {
+                alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+            }
+        });
     }
 
     ListColor = [
