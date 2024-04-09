@@ -45,3 +45,9 @@ input[type="number"]::-ms-clear,
 input[type="number"]::-ms-reveal {
     display: none;
 }
+
+#Passengers {
+    max-height: 150px; /* Максимальная высота блока */
+    overflow-y: auto; /* Вертикальная прокрутка по необходимости */
+    width: 240px; /* Ширина блока, можно настроить по вашим потребностям */
+  }

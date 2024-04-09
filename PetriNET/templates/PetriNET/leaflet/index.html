@@ -978,7 +978,9 @@
 
     function clear_bus_stop_markers() {
         bus_stop_markers.forEach(bus_stop => {
-            bus_stop.marker.remove()
+            if (bus_stop.marker) {
+                bus_stop.marker.remove()
+            }
         })
         bus_stop_markers = []
     }
@@ -1044,6 +1046,113 @@
     }
 
 
+    function SetDataToBPopup(BMarker) {
+        var BPopup
+        var BIDValue
+        var BRIDValue
+            $(".BPassengers").each(function() {
+                var popupContent = $(this)
+                BIDValue = popupContent.find("#BID").val();
+                BRIDValue = popupContent.find("#BRID").val();
+                BPopup = this
+            });
+        let PassengersDiv = $(BPopup).find('#Passengers')
+        PassengersDiv.html('')
+
+        $('#Passengers').each(function() {
+            if (BRIDValue) {
+                // Автобус
+                bus = bus_markers.find(bus => bus.bus_id == BIDValue && bus.route_id == BRIDValue)
+                bus.passengers.forEach(passenger => {
+                    var AppendDiv = `
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon3">${passenger.name}</span>
+                        </div>
+                        <span class="input-group-text" id="basic-addon3" onmouseover="ShowBS(${passenger.start})" onmouseout="HiddenShowBS()">${passenger.start}</span>
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="basic-addon3" onmouseover="ShowBS(${passenger.end})" onmouseout="HiddenShowBS()">${passenger.end}</span>
+                        </div>
+
+                    </div>
+                    `
+                    PassengersDiv.append(AppendDiv)
+                })
+            }
+            else {
+                // Остановка
+                bus_stop = bus_stop_markers.find(bus_stop => bus_stop.id == BIDValue)
+                bus_stop.passengers.forEach(passenger => {
+                    var AppendDiv = `
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon3">${passenger.name}</span>
+                        </div>
+                        <span class="input-group-text" id="basic-addon3" onmouseover="ShowBS(${passenger.start})" onmouseout="HiddenShowBS()">${passenger.start}</span>
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="basic-addon3" onmouseover="ShowBS(${passenger.end})" onmouseout="HiddenShowBS()">${passenger.end}</span>
+                        </div>
+
+                    </div>
+                    `
+                    PassengersDiv.append(AppendDiv)
+                })
+            }
+        });
+    }
+
+
+    let ShowBSMarker
+
+    function ShowBS(id) {
+        function Change_marker(bus_stop) {
+            if (ShowBSMarker) {
+                ShowBSMarker.remove()
+                ShowBSMarker = null
+            }
+            let style = {
+            radius: 15,
+            fillOpacity: 0.5,
+            color: 'blue',
+            };
+            ShowBSMarker = L.circleMarker([bus_stop.lat, bus_stop.lng], style).addTo(map).on('click', HiddenShowBS)
+            // ShowBSMarker = L.marker([bus_stop.lat, bus_stop.lng], { opacity: 0.5, draggable: true}).addTo(map).on('click', HiddenShowBS)
+        }
+        bus_stop = bus_stop_markers.find(bus_stop => bus_stop.id == id)
+        if (bus_stop) {
+            Change_marker(bus_stop)
+        }
+        else {
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '{% url "PetriNET:get_bs" %}',
+                method: 'get',
+                dataType: 'html',
+                headers: { 'X-CSRFToken': csrftoken },
+                data: {
+                    "id": id,
+                },
+                success: function (response) {
+                    response_json = JSON.parse(response)
+                    bus_stop = response_json.BusStop
+                    bus_stop_markers.push(bus_stop)
+                    Change_marker(bus_stop)
+                },
+                error: function (jqXHR, exception) {
+                    console.log(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                }
+            });
+        }
+    }
+
+    function HiddenShowBS() {
+        if (ShowBSMarker) {
+            ShowBSMarker.remove()
+            ShowBSMarker = null
+        }
+    }
+
+
     // Функция отрисовки таймпоинта
     function setStepAction(step) {
         function bus_stop_marker_html(passengers_count) {
@@ -1079,18 +1188,29 @@
                     // Создаем иконку из HTML-элемента
                     iconElement.innerHTML = bus_marker_html(bus.passengers_count)
 
+                    let popup = `
+                        <div class="BPassengers">
+                            <p>Пассажиры:</p>
+                            <input id="BID" type="text" value="${bus.bus_id}" hidden>
+                            <input id="BRID" type="text" value="${bus.route_id}" hidden>
+                            <div id="Passengers">
+                            </div>
+                        </div>
+                        `
+
                     var busIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: iconElement.innerHTML,
                         iconSize: [16, 42],
                         iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
                     });
-                    bus.marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", icon: busIcon }).addTo(map)
+                    bus.marker = L.marker([bus.lat, bus.lng], { alt: "Автобус", icon: busIcon }).bindPopup(popup).on('click', SetDataToBPopup).addTo(map)
                     bus_markers.push(bus)
                 }
                 else {
                     if (bus_action.passengers_count != bus.passengers_count) {
-                        // Поменять число пассажиров автобуса
+                        // Поменять пассажиров автобуса
+                        bus.passengers = bus_action.passengers
                         bus.passengers_count = bus_action.passengers_count
                         var icon = bus.marker.getIcon()
                         icon.options.html = bus_marker_html(bus.passengers_count)
@@ -1104,8 +1224,10 @@
                         bus.lng = bus_action.lng
                         var new_animation = new L.PosAnimation()
                         animation_list.push(new_animation)
+                        new_animation.once('end',function() {
+                            bus.marker.setLatLng([bus.lat, bus.lng]);
+                        });
                         new_animation.run(bus.marker._icon, pos_end, 0.3);
-                    
                     }
                 }
             }
@@ -1120,6 +1242,15 @@
                 // Создаем иконку из HTML-элемента
                 iconElement.innerHTML = bus_stop_marker_html(bus_stop.passengers_count)
 
+                let popup = `
+                        <div class="BPassengers">
+                            <p>Пассажиры:</p>
+                            <input id="BID" type="text" value="${bus_stop.id}" hidden>
+                            <div id="Passengers">
+                            </div>
+                        </div>
+                        `
+
                 var bus_stop_icon = L.divIcon({
                     className: 'custom-div-icon',
                     html: iconElement.innerHTML,
@@ -1127,13 +1258,14 @@
                     iconAnchor: [8, 21] // Точка, которая будет соответствовать координате маркера
                     // Возможно стоит сделать чуть правее, чтобы автобус не переграждал
                 });
-                bus_stop.marker = L.marker([bus_stop.lat, bus_stop.lng], { alt: "Автобус", icon: bus_stop_icon }).addTo(map)
+                bus_stop.marker = L.marker([bus_stop.lat, bus_stop.lng], { alt: "Автобус", icon: bus_stop_icon }).bindPopup(popup).on('click', SetDataToBPopup).addTo(map)
                 BusStops.addLayer(bus_stop.marker)
                 bus_stop_markers.push(bus_stop)
             }
             else {
                 if (bus_stop_action.passengers_count != bus_stop.passengers_count) {
-                    // Поменять число пассажиров остановки
+                    // Поменять пассажиров остановки
+                    bus_stop.passengers = bus_stop_action.passengers
                     bus_stop.passengers_count = bus_stop_action.passengers_count
                     var icon = bus_stop.marker.getIcon()
                     icon.options.html = bus_stop_marker_html(bus_stop.passengers_count)
@@ -1142,7 +1274,7 @@
             }
         }
         bus_stop_markers.forEach(bus_stop => {
-            if (!simulation_data.calculate[step - 1][1].BusStops.find(bus_stop_in_action => bus_stop.id == bus_stop_in_action.id)) {
+            if (!simulation_data.calculate[step - 1][1].BusStops.find(bus_stop_in_action => bus_stop.id == bus_stop_in_action.id) && bus_stop.marker) {
                 bus_stop.passengers = []
                 bus_stop.passengers_count = 0
                 var icon = bus_stop.marker.getIcon()

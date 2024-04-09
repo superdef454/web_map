@@ -87,6 +87,23 @@ class BusStopView(View):
         )
         return JsonResponse({'error': 0, 'BusStop': {'id': add.id}})
 
+    def get(self, request):
+        """Добавление остановки"""
+        id = request.GET.get('id')
+        if not id:
+            return JsonResponse({
+                'error': 1,
+                'error_message': 'Ошибка заполнения данных'
+            })
+        bus_stop = BusStop.objects.get(
+            id=id,
+        )
+        return JsonResponse({'error': 0, 'BusStop': {
+            'id': bus_stop.id,
+            'lat': bus_stop.latitude,
+            'lng': bus_stop.longitude,
+            }})
+
 
 class RouteView(View):
     """Класс работы с маршрутами"""
