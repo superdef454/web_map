@@ -231,7 +231,7 @@
     let BSPassengersDirections = {}
 
     var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
-    L.control.attribution({ prefix: 'Маршрутно-транспортные сети | <a href="{% url "admin:index" %}">Админ панель</a>' }).addTo(map);
+    L.control.attribution({ prefix: 'Маршрутно-транспортные сети | {% if user.is_superuser %}<a href="{% url "admin:index" %}">Админ панель</a>{% else %}<a href="{% url "accounts:logout" %}">Выйти</a>{% endif %}' }).addTo(map);
 
     // Карты
     var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);

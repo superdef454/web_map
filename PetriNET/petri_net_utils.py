@@ -541,6 +541,7 @@ def CreateResponseFile(data_to_report: dict) -> str:
     if bus_stops:
         doc.add_paragraph('Автобусные остановки:')
         table = doc.add_table(rows=1, cols=4)
+        table.style = 'Table Grid'
         hdr_cells = table.rows[0].cells
         hdr_cells[0].text = 'Остановка'
         hdr_cells[1].text = 'Количество пассажиров'
@@ -558,6 +559,7 @@ def CreateResponseFile(data_to_report: dict) -> str:
     if routes:
         doc.add_paragraph('\nМаршруты:')
         table = doc.add_table(rows=1, cols=8)
+        table.style = 'Table Grid'
         hdr_cells = table.rows[0].cells
         hdr_cells[0].text = 'Маршрут'
         hdr_cells[1].text = 'Тип транспортного средства, Название, вместимость'
