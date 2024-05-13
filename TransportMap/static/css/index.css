@@ -51,3 +51,7 @@ input[type="number"]::-ms-reveal {
     overflow-y: auto; /* Вертикальная прокрутка по необходимости */
     width: 240px; /* Ширина блока, можно настроить по вашим потребностям */
   }
+
+.dropdown-menu { max-height: 280px; overflow-y: auto; min-width: 100% !important; background-attachment: local, local, scroll, scroll; }
+
+.dropdown-item { white-space: normal; }

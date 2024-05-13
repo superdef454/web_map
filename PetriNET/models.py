@@ -14,7 +14,7 @@ def validate_longitude(value):
 
 
 class City(models.Model):
-    region = models.SmallIntegerField(verbose_name="Регион", validators=[MaxValueValidator(1000)])
+    # region = models.SmallIntegerField(verbose_name="Регион", validators=[MaxValueValidator(1000)])
     name = models.CharField(verbose_name="Название города", max_length=250)
     latitude = models.FloatField(verbose_name="Широта", validators=[validate_latitude])
     longitude = models.FloatField(verbose_name="Долгота", validators=[validate_longitude])

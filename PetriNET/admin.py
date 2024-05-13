@@ -5,7 +5,7 @@ from .models import City, BusStop, Route, TC, EI
 
 
 @admin.register(Route)
-class ClassAdmin(admin.ModelAdmin):
+class ClassRouteAdmin(admin.ModelAdmin):
     # Отключение возможность создания маршрутов без остановок из админ-панели
     def has_add_permission(self, request, obj=None):
         return False
@@ -16,17 +16,20 @@ class ClassAdmin(admin.ModelAdmin):
 
 
 @admin.register(BusStop)
-class ClassAdmin(admin.ModelAdmin):
+class ClassBusStopAdmin(admin.ModelAdmin):
     list_filter = ('city',)
     search_fields = ('name',)
     list_display = ('name', 'city')
 
 
 @admin.register(TC)
-class ClassTC(admin.ModelAdmin):
+class ClassTCAdmin(admin.ModelAdmin):
     list_display = ('name', 'capacity')
     search_fields = ('name',)
 
 
-admin.site.register(City)
+@admin.register(City)
+class ClassCityAdmin(admin.ModelAdmin):
+    search_fields = ('name',)
+
 # admin.site.register(EI)
