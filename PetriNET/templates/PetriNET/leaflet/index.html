@@ -12,6 +12,8 @@
 <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
 <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
 {% endblock %}
 {% block js %}
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
@@ -26,6 +28,7 @@
     crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster-src.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
 {{ citys|json_script:"citys_json" }}
 {% endblock %}
@@ -237,7 +240,7 @@
 
     // Поверхности объектов
     let BusStops = L.layerGroup().addTo(map);
-    let CitysLayer = L.layerGroup().addTo(map);
+    let CitysLayer = L.markerClusterGroup().addTo(map);
     let RouteLayer = L.layerGroup().addTo(map);
 
     // Настройки карты в правом окошке
@@ -255,12 +258,17 @@
     // Разбор данных городов
     let citys = JSON.parse(document.getElementById('citys_json').textContent)
     citys.forEach(city => {
+        var CityIcon = L.icon({
+            iconUrl: '{% static 'city_icon.png' %}',
+            iconSize: [26, 26], // Размеры иконки
+            iconAnchor: [13, 30], // Точка, которая соответствует "ноге" маркера
+            popupAnchor: [1, -25] // Точка относительно иконки, где будет отображаться всплывающее окно
+        });
         let city_style = {
-            radius: 5,
-            fillOpacity: 0.5,
-            color: 'black',
+            icon: CityIcon,
+            alt: city.name,
         };
-        CitysLayer.addLayer(L.circleMarker([city.latitude, city.longitude], city_style)
+        CitysLayer.addLayer(L.marker([city.latitude, city.longitude], city_style)
             .bindPopup(`<a href="#" onclick="ChoiceCity(${city.id})">${city.name}</a>`).on('dblclick', (event) => {
                 ChoiceCity(city.id)
             }));
