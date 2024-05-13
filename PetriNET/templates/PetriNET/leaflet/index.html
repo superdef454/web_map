@@ -11,6 +11,7 @@
 <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">
 <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
 <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.min.css">
 {% endblock %}
 {% block js %}
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
@@ -25,6 +26,7 @@
     crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
 {{ citys|json_script:"citys_json" }}
 {% endblock %}
 
@@ -34,19 +36,15 @@
 <div id="left-panel" class="container d-flex align-items-center">
     <div id="left-function-panel" class="row shadow-sm">
         <div class="dropdown mb-3">
-            <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown"
-                aria-haspopup="true" aria-expanded="false">
-                Выберите город
-            </button>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+            <select class="selectpicker" title="Выберите город" data-style="btn-primary" data-live-search="true" id="dropdownMenuButton" onchange="ChangeCityOnSelect(this)">
                 {% if citys %}
                 {% for city in citys %}
-                <button class="dropdown-item" onclick="ChoiceCity({{city.id}})">{{city.name}}</button>
+                <option value="{{city.id}}">{{city.name}}</option>
                 {% endfor %}
                 {% else %}
-                <a class="dropdown-item" href="{% url 'admin:index' %}">Добавить</a>
+                <option><a class="dropdown-item" href="{% url 'admin:index' %}">Добавить</a></option>
                 {% endif %}
-            </div>
+            </select>
         </div>
         <div class="card bg-transparent border-primary w-100 mb-3">
             <div class="card-header bg-light">
@@ -507,6 +505,12 @@
 
     // Добавление остановки в группу остановок на карту
     function AddBS(latlng, id, name) {
+        var busStopIcon = L.icon({
+            iconUrl: '{% static 'bus_icon.png' %}',
+            iconSize: [14, 14], // Размеры иконки
+            iconAnchor: [7, 7], // Точка, которая соответствует "ноге" маркера
+            popupAnchor: [1, -20] // Точка относительно иконки, где будет отображаться всплывающее окно
+        });
         let popup = `<a href="{% url 'admin:index' %}PetriNET/busstop/${id}/change/"><p>${name} ID: ${id}</p></a>`
         popup += `
             <div class="BusStopPassengers">
@@ -522,7 +526,7 @@
                 <button type="button" class="btn btn-primary btn-block mt-3" title="Добавить направление" onclick="AddDirection(this, ${id})">+</button>
             </div>
             `
-        BusStops.addLayer(L.marker(latlng, { alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
+        BusStops.addLayer(L.marker(latlng, { icon: busStopIcon, alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
     }
 
     // Добавление маршрута в список
@@ -604,8 +608,16 @@
                 Reset()
             }
             CurrentCity = City;
-            $("#dropdownMenuButton").text(City.name);
+            $('#dropdownMenuButton').val(id);
+            $('#dropdownMenuButton').selectpicker('refresh')
             UpdateCityData()
+        }
+    }
+
+    function ChangeCityOnSelect(selectObject) {
+        var value = selectObject.value;
+        if (value) {
+            ChoiceCity(value)
         }
     }
 
@@ -1381,6 +1393,10 @@
             }
         });
     }
+
+    $(document).ready(function() {
+        $('.selectpicker').selectpicker();
+    });
 
     ListColor = [
         "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"

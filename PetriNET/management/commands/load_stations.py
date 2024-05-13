@@ -1,20 +1,41 @@
-import csv
-from django.conf import settings
 from django.core.management.base import BaseCommand
-from PetriNET.models import BusStop
-# from OSMPythonTools.api import Api
-# from OSMPythonTools.nominatim import Nominatim
-
+import requests
+from PetriNET.models import BusStop, City
 
 
 class Command(BaseCommand):
-    help = 'Парсинг данных остановок с апи OSM'
+    help = 'Парсинг данных остановок'
 
-    def handle(self, *args, **kwargs):
-        pass
-        # https://wiki.openstreetmap.org/wiki/RU:API_v0.6
-        # https://data.nextgis.com/ru/region/RU-ORE/base
-        # https://stackoverflow.com/questions/15617077/overpass-api-get-all-public-transport-stops-with-a-certain-name?rq=4
-        # https://stackoverflow.com/questions/26126272/getting-every-single-public-transport-stop-coordinates?rq=4
-        # https://stackoverflow.com/questions/20322823/how-to-get-all-roads-around-a-given-location-in-openstreetmap?rq=3
-        # https://stackoverflow.com/questions/7139118/list-of-bus-stops-from-google-maps?rq=3
+    def add_arguments(self, parser):
+        parser.add_argument('--city_id', type=int, required=True)
+
+    def handle(self, city_id, *args, **kwargs):
+        self.get_bus_stops(city_id=city_id)
+
+    def get_bus_stops(self, city_id: int) -> None:
+        """
+        Получение остановок города
+        """
+        city = City.objects.get(id=city_id)
+        url = "https://overpass-api.de/api/interpreter"
+        query = f"""
+        [out:json];
+        node(around:30000,{city.latitude},{city.longitude})["highway"="bus_stop"];
+        out;
+        """
+        response = requests.get(url, params={'data': query})
+        bus_stops_data = response.json()
+
+        bus_stops = []
+        for element in bus_stops_data['elements']:
+            if 'tags' in element and 'name' in element['tags']:
+                bus_stop_name = element['tags']['name']
+                bus_stop_lat = element['lat']
+                bus_stop_lon = element['lon']
+                bus_stops.append(BusStop(
+                    city=city,
+                    name=bus_stop_name,
+                    latitude=bus_stop_lat,
+                    longitude=bus_stop_lon
+                ))
+        BusStop.objects.bulk_create(bus_stops)

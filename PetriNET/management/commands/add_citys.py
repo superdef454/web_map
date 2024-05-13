@@ -1,11 +1,7 @@
-# import csv
-# from django.conf import settings
 import logging
 from django.core.management.base import BaseCommand
 from PetriNET.models import City
 import requests
-# from OSMPythonTools.api import Api
-# from OSMPythonTools.nominatim import Nominatim
 
 
 logger = logging.getLogger('PetriNetManager')
