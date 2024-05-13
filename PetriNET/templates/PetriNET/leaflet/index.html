@@ -45,7 +45,7 @@
                 <option value="{{city.id}}">{{city.name}}</option>
                 {% endfor %}
                 {% else %}
-                <option><a class="dropdown-item" href="{% url 'admin:index' %}">Добавить</a></option>
+                <option value="0">Добавить</option>
                 {% endif %}
             </select>
         </div>
@@ -339,7 +339,8 @@
                     },
                     success: function (data) {
                         if (JSON.parse(data).error == 0) {
-                            AddBS(TempMarker.getLatLng(), JSON.parse(data).BusStop.id, BusStopName);
+                            latlng = [TempMarker.getLatLng().lat, TempMarker.getLatLng().lng]
+                            AddBS(latlng, JSON.parse(data).BusStop.id, BusStopName);
                             CloseAllAction();
                         }
                         else {
@@ -511,13 +512,16 @@
         }
     }
 
+    var canvasRenderer = L.canvas();
+
     // Добавление остановки в группу остановок на карту
     function AddBS(latlng, id, name) {
-        var busStopIcon = L.icon({
+                var busStopIcon = L.icon({
             iconUrl: '{% static 'bus_icon.png' %}',
             iconSize: [14, 14], // Размеры иконки
             iconAnchor: [7, 7], // Точка, которая соответствует "ноге" маркера
-            popupAnchor: [1, -20] // Точка относительно иконки, где будет отображаться всплывающее окно
+            popupAnchor: [1, -20], // Точка относительно иконки, где будет отображаться всплывающее окно
+            renderer: canvasRenderer
         });
         let popup = `<a href="{% url 'admin:index' %}PetriNET/busstop/${id}/change/"><p>${name} ID: ${id}</p></a>`
         popup += `
@@ -624,6 +628,15 @@
 
     function ChangeCityOnSelect(selectObject) {
         var value = selectObject.value;
+        if (value == "0") {
+            const link = document.createElement('a');
+            url = "{% url 'admin:index' %}"
+            link.href = url;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
         if (value) {
             ChoiceCity(value)
         }

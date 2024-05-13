@@ -1,6 +1,6 @@
 from django.db import models
 from django.forms import ValidationError
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 
 def validate_latitude(value):
@@ -45,8 +45,24 @@ class BusStop(models.Model):
     # TODO one-to-one field к остановке напротив, также добавить в расчёт чтобы пассажир доезжал только до остановки напротив если она ближе
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE, db_index=True)
     name = models.CharField(verbose_name="Название остановки", max_length=250)
-    latitude = models.FloatField(verbose_name="Широта", validators=[validate_latitude])
-    longitude = models.FloatField(verbose_name="Долгота", validators=[validate_longitude])
+    latitude = models.DecimalField(
+        verbose_name="Широта",
+        max_digits=9,  # Максимальное количество цифр всего (включая знаки после запятой)
+        decimal_places=5,  # Количество знаков после запятой
+        validators=[
+            MinValueValidator(-90.0),
+            MaxValueValidator(90.0)
+        ]
+    )
+    longitude = models.DecimalField(
+        verbose_name="Долгота",
+        max_digits=10,  # Учитывая, что долгота может быть от -180 до 180
+        decimal_places=5,
+        validators=[
+            MinValueValidator(-180.0),
+            MaxValueValidator(180.0)
+        ]
+    )
 
     def __str__(self):
         return self.name

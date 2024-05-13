@@ -32,12 +32,11 @@ class ClassTCAdmin(admin.ModelAdmin):
 class ClassCityAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     actions = ['update_bus_stops']
-    save_on_top = True
 
     def update_bus_stops(self, request, queryset):
         for city in queryset:
             call_command('load_stations', city_id=city.id)
-        self.message_user(request, "Bus stops updated successfully.")
+        self.message_user(request, "Остановочные пункты успешно добавлены.")
     update_bus_stops.short_description = "Добавление данных остановочных пунктов"
 
 # admin.site.register(EI)

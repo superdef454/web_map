@@ -20,7 +20,7 @@ class Command(BaseCommand):
         url = "https://overpass-api.de/api/interpreter"
         query = f"""
         [out:json];
-        node(around:30000,{city.latitude},{city.longitude})["highway"="bus_stop"];
+        node(around:10000,{city.latitude},{city.longitude})["highway"="bus_stop"];
         out;
         """
         response = requests.get(url, params={'data': query})
