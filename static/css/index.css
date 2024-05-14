@@ -1,0 +1,57 @@
+#map { 
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+#left-panel{
+    width: 350px;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translate(0, -50%);
+    z-index: 900;
+    margin: 10px 0 20px 55px;
+}
+
+#bottom-panel{
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+}
+
+.partition{
+    border-left: solid white;
+    border-width: 0px 0px 0px 1px;
+}
+
+
+/* Для WebKit-браузеров */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Для Firefox */
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* Для IE и Edge */
+input[type="number"]::-ms-clear,
+input[type="number"]::-ms-reveal {
+    display: none;
+}
+
+#Passengers {
+    max-height: 150px; /* Максимальная высота блока */
+    overflow-y: auto; /* Вертикальная прокрутка по необходимости */
+    width: 240px; /* Ширина блока, можно настроить по вашим потребностям */
+  }
+
+.dropdown-menu { max-height: 280px; overflow-y: auto; min-width: 100% !important; background-attachment: local, local, scroll, scroll; }
+
+.dropdown-item { white-space: normal; }

@@ -1,8 +1,6 @@
 FROM nginx:1.25
 
-ENV HOME=/home/
-ENV APP_HOME=/home/TransportMap
-RUN mkdir $APP_HOME
+ENV APP_HOME=/home/
 RUN mkdir $APP_HOME/static
 WORKDIR $APP_HOME
 
