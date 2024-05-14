@@ -243,6 +243,17 @@
     let CitysLayer = L.markerClusterGroup().addTo(map);
     let RouteLayer = L.layerGroup().addTo(map);
 
+    // Обработчик изменения масштаба карты
+    map.on('zoomend', function() {
+        var currentZoom = map.getZoom();
+        // Управление видимостью маркеров в зависимости от уровня зума
+        if (currentZoom < 15 && BusStops.getLayers().length >= 1000) {
+            map.removeLayer(BusStops);
+        } else {
+            map.addLayer(BusStops);
+        }
+    });
+
     // Настройки карты в правом окошке
     let Maps = {
         "OpenStreetMap": lyrOSM,

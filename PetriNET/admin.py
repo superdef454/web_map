@@ -31,7 +31,9 @@ class ClassTCAdmin(admin.ModelAdmin):
 @admin.register(City)
 class ClassCityAdmin(admin.ModelAdmin):
     search_fields = ('name',)
+    list_display = ('name',)
     actions = ['update_bus_stops']
+    ordering = ('name',)
 
     def update_bus_stops(self, request, queryset):
         for city in queryset:
