@@ -249,6 +249,10 @@
         // Управление видимостью маркеров в зависимости от уровня зума
         if (currentZoom < 15 && BusStops.getLayers().length >= 1000) {
             map.removeLayer(BusStops);
+            return
+        }
+        if (currentZoom < 11) {
+            map.removeLayer(BusStops);
         } else {
             map.addLayer(BusStops);
         }
