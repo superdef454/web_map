@@ -11,6 +11,5 @@ WORKDIR /web_map
 # Запускает команду pip install для всех библиотек, перечисленных в req.txt
 RUN pip install -r req.txt
 
-# RUN adduser --disabled-password optimove
-
-# USER optimove
+COPY --chmod=555 entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

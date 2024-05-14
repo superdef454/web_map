@@ -1,6 +1,13 @@
 version: '3.8'
 services:
 
+  nginx:
+    build: ./nginx
+    ports:
+      - 1337:80
+    depends_on:
+      - optimove
+
   postgre:
     image: postgres:16.2-alpine
     environment:
@@ -15,8 +22,8 @@ services:
       context: .
     volumes:
       - ./:/web_map
-    ports:
-      - '8000:8000'
+    expose:
+      - 8000
     environment:
       - SQL_ENGINE=django.db.backends.postgresql
       - DB_HOST=postgre

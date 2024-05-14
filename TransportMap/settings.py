@@ -21,16 +21,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-w7b*n16k(+zjj!mgx9svxxi=834*q0!$oa1#5g8#lxv!)1!2wv'
-
+SECRET_KEY = os.environ.get("SECRET_KEY", "foo")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = bool(os.environ.get("DEBUG", default=1))
 
-ALLOWED_HOSTS = [
-    '0.0.0.0',
-    '127.0.0.1',
-    'localhost',
-]
+ALLOWED_HOSTS = ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "0.0.0.0 127.0.0.1 localhost").split(" ")
 
 
 # Application definition
@@ -86,8 +81,8 @@ WSGI_APPLICATION = 'TransportMap.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'OptiMoVe'),
+        "ENGINE": os.environ.get("SQL_ENGINE", "django.db.backends.sqlite3"),
+        'NAME': os.environ.get('DB_NAME', BASE_DIR / "db.sqlite3"),
         'USER': os.environ.get('DB_USER', 'postgres'),
         'PASSWORD': os.environ.get('DB_PASS', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
