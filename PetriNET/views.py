@@ -192,5 +192,5 @@ def download_report_file(request):
     except Exception:
         logger.exception('Ошибка формирования файла отчёта')
     # Возвращаем URL для скачивания файла
-    download_url = request.build_absolute_uri('/') + file_path
-    return JsonResponse({'download_url': download_url})
+    file_path = file_path
+    return JsonResponse({'file_path': file_path})

@@ -1418,7 +1418,8 @@
             success: function (response) {
                 // Создаём временную ссылку для скачивания файла
                 const link = document.createElement('a');
-                link.href = JSON.parse(response).download_url;
+                const currentUrl = window.location.href;
+                link.href = currentUrl + JSON.parse(response).file_path;
                 link.setAttribute('download', ''); // Необходимо для некоторых браузеров
                 document.body.appendChild(link);
                 link.click();

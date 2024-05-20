@@ -9,6 +9,7 @@ services:
       - optimove
     volumes:
       - ./static:/home/static
+      - ./media:/home/media
 
   postgre:
     image: postgres:16.2-alpine
