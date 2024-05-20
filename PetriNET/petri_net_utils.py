@@ -133,7 +133,7 @@ class PetriNet():
             # Удобное хранение данных маршрута
             bus_stop_id = 0
             for bs in self.route.busstop.all():
-                if point[0] == bs.latitude and point[1] == bs.longitude:
+                if point[0] == float(bs.latitude) and point[1] == float(bs.longitude):
                     bus_stop_id = bs.id
                     break
             return {
