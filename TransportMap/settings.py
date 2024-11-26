@@ -25,9 +25,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "foo")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(os.environ.get("DEBUG", default=1))
 
-ALLOWED_HOSTS = ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "0.0.0.0 127.0.0.1 localhost").split(" ")
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "0.0.0.0 127.0.0.1 localhost").split(" ") + ["optimove"]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:1337", "http://127.0.0.1:1337"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:1337", "http://127.0.0.1:1337", "http://0.0.0.0:1337"]
 
 # Application definition
 
