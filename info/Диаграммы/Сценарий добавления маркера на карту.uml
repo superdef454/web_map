@@ -1,0 +1,73 @@
+@startuml СценарийДобавленияМаркера
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam maxMessageSize 100
+skinparam sequenceParticipant underline
+
+actor Пользователь as User
+participant "Веб-браузер" as Browser
+participant "JavaScript" as JS
+participant "Веб-сервер" as WebServer
+participant "Контроллер" as Controller
+participant "Сервис карт" as MapService
+database "База данных" as DB
+
+User -> Browser : Клик на карте
+activate Browser
+
+Browser -> JS : Событие клика
+activate JS
+
+JS -> JS : Создание маркера
+JS -> Browser : Отображение маркера
+Browser --> User : Визуальное подтверждение
+
+User -> Browser : Заполнение информации о маркере
+Browser -> JS : Данные маркера
+
+JS -> WebServer : AJAX запрос на сохранение маркера
+activate WebServer
+
+WebServer -> Controller : Передача данных маркера
+activate Controller
+
+alt Корректные входные данные
+    Controller -> MapService : Запрос на сохранение маркера
+    activate MapService
+    
+    MapService -> DB : SQL запрос на добавление записи
+    activate DB
+    
+    alt Успешное сохранение в БД
+        DB --> MapService : Подтверждение сохранения
+        MapService --> Controller : Успешное сохранение
+        Controller --> WebServer : Ответ об успешном сохранении
+        WebServer --> JS : HTTP ответ (200 OK)
+        JS --> Browser : Обновление интерфейса
+        Browser --> User : Подтверждение сохранения маркера
+    else Ошибка сохранения в БД
+        DB --> MapService : Ошибка сохранения
+        MapService -> MapService : Логирование ошибки
+        MapService --> Controller : Сообщение об ошибке БД
+        Controller --> WebServer : JSON с ошибкой
+        WebServer --> JS : HTTP ответ с кодом ошибки
+        JS --> Browser : Отображение ошибки
+        Browser --> User : Сообщение об ошибке сохранения
+    end
+    deactivate DB
+    deactivate MapService
+    
+else Некорректные входные данные
+    Controller -> Controller : Валидация данных
+    Controller --> WebServer : JSON с ошибкой {'error': 1, 'error_message': 'Ошибка заполнения данных'}
+    WebServer --> JS : HTTP ответ с ошибкой валидации
+    JS --> Browser : Отображение ошибки валидации
+    Browser --> User : Сообщение о неверном заполнении данных
+end
+
+deactivate Controller
+deactivate WebServer
+deactivate JS
+deactivate Browser
+
+@enduml

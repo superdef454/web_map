@@ -82,8 +82,8 @@ WSGI_APPLICATION = 'TransportMap.wsgi.application'
 
 DATABASES = {
     'default': {
-        "ENGINE": os.environ.get("SQL_ENGINE", "django.db.backends.sqlite3"),
-        'NAME': os.environ.get('DB_NAME', BASE_DIR / "db.sqlite3"),
+        "ENGINE": os.environ.get("SQL_ENGINE", "django.db.backends.postgresql"),
+        'NAME': os.environ.get('DB_NAME', "OptiMoVe"),
         'USER': os.environ.get('DB_USER', 'postgres'),
         'PASSWORD': os.environ.get('DB_PASS', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),

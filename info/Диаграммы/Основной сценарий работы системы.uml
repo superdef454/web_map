@@ -1,0 +1,155 @@
+@startuml ОсновнойСценарийРаботыСистемы
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam maxMessageSize 100
+skinparam sequenceParticipant underline
+skinparam SequenceBoxBorderColor #2C3E50
+skinparam SequenceBoxBackgroundColor #ECF0F1
+skinparam SequenceBoxFontColor #2C3E50
+
+actor "Пользователь" as User
+participant "Веб-браузер" as Browser
+participant "JavaScript/AJAX" as JS
+participant "Django View" as View
+participant "PetriNET" as PetriNet
+database "База данных" as DB
+participant "Файловая система" as FileSystem
+
+== Инициализация и загрузка карты ==
+
+User -> Browser : Открытие приложения
+activate Browser
+
+Browser -> View : HTTP запрос (GET /map/)
+activate View
+
+View -> DB : Запрос данных городов
+activate DB
+DB --> View : Список городов
+deactivate DB
+
+View --> Browser : Ответ с HTML-страницей и данными городов
+deactivate View
+
+Browser -> Browser : Рендеринг карты
+Browser --> User : Отображение карты
+
+== Выбор города и маршрутов ==
+
+User -> Browser : Выбор города
+activate Browser
+
+Browser -> JS : Обработка события
+activate JS
+
+JS -> View : AJAX запрос (GET /city/?city_id=X)
+activate View
+
+View -> DB : Запрос остановок и маршрутов
+activate DB
+
+alt Успешное получение данных
+    DB --> View : Данные остановок и маршрутов
+    View --> JS : JSON ответ с данными
+    JS -> Browser : Обновление карты
+    Browser --> User : Отображение остановок и маршрутов
+else Ошибка получения данных
+    DB --> View : Ошибка запроса
+    View --> JS : JSON с кодом ошибки
+    JS -> Browser : Отображение сообщения об ошибке
+    Browser --> User : Сообщение об ошибке
+end
+deactivate DB
+deactivate View
+deactivate JS
+deactivate Browser
+
+User -> Browser : Выбор маршрутов для расчёта
+activate Browser
+Browser -> JS : Сбор данных о выбранных маршрутах
+deactivate Browser
+
+== Расчёт маршрута и моделирование ==
+
+User -> Browser : Запуск расчёта
+activate Browser
+
+Browser -> JS : Сбор входных данных
+activate JS
+
+JS -> View : AJAX запрос (POST /calculate/)
+activate View
+
+View -> View : Парсинг JSON-данных
+note right: GetDataToCalculate()
+
+alt Успешный парсинг данных
+    View -> PetriNet : Инициализация модели Петри
+    activate PetriNet
+
+    PetriNet -> PetriNet : Расчёт нагрузки
+    note right: petri_net.Calculation()
+
+    PetriNet -> PetriNet : Подготовка данных для отчёта
+    note right: CreateDataToReport()
+
+    alt Успешный расчёт
+        PetriNet --> View : Результаты расчёта
+        View --> JS : JSON с результатами
+        JS -> Browser : Обработка результатов
+    else Ошибка расчёта
+        PetriNet --> View : Исключение
+        View --> JS : JSON с кодом ошибки 2
+        JS -> Browser : Отображение ошибки расчёта
+    end
+    deactivate PetriNet
+
+else Ошибка парсинга данных
+    View --> JS : JSON с кодом ошибки 1
+    JS -> Browser : Отображение ошибки парсинга
+end
+deactivate View
+deactivate JS
+
+== Отображение результатов ==
+
+alt Успешный расчёт
+    Browser -> Browser : Визуализация результатов на карте
+    Browser -> Browser : Отображение графиков нагрузки
+    Browser --> User : Интерактивное представление результатов
+else Ошибка расчёта
+    Browser --> User : Сообщение об ошибке
+end
+deactivate Browser
+
+== Загрузка файла отчёта ==
+
+User -> Browser : Запрос на формирование отчёта
+activate Browser
+
+Browser -> JS : Запрос на создание отчёта
+activate JS
+
+JS -> View : AJAX запрос (POST /download_report/)
+activate View
+
+View -> View : CreateResponseFile()
+View -> FileSystem : Сохранение файла отчёта
+activate FileSystem
+FileSystem --> View : Путь к файлу
+deactivate FileSystem
+
+alt Успешное создание отчёта
+    View --> JS : JSON с путём к файлу
+    JS -> Browser : Инициирование скачивания
+    Browser --> User : Диалог скачивания файла
+else Ошибка создания отчёта
+    View --> JS : JSON с ошибкой
+    JS -> Browser : Отображение ошибки
+    Browser --> User : Сообщение о невозможности создать отчёт
+end
+deactivate View
+deactivate JS
+deactivate Browser
+
+@enduml

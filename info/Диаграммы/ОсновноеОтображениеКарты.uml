@@ -1,0 +1,76 @@
+@startuml ОсновноеОтображениеКарты
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam maxMessageSize 100
+skinparam sequenceParticipant underline
+
+actor Пользователь as User
+participant "Веб-браузер" as Browser
+participant "Веб-сервер" as WebServer
+participant "Контроллер" as Controller
+participant "Сервис карт" as MapService
+participant "Внешнее API карт" as ExternalAPI
+database "База данных" as DB
+
+User -> Browser : Запрос страницы с картой
+activate Browser
+
+Browser -> WebServer : HTTP запрос
+activate WebServer
+
+WebServer -> Controller : Обработка запроса
+activate Controller
+
+Controller -> MapService : Запрос данных карты
+activate MapService
+
+MapService -> DB : Запрос сохраненных маркеров
+activate DB
+
+alt Успешное подключение к БД
+    DB --> MapService : Возврат маркеров
+else Ошибка подключения к БД
+    DB --> MapService : Ошибка подключения
+    MapService -> MapService : Логирование ошибки
+    MapService --> Controller : Сообщение об ошибке БД
+    Controller --> WebServer : Код ошибки
+    WebServer --> Browser : HTTP ответ 500
+    Browser --> User : Сообщение об ошибке сервера
+end
+deactivate DB
+
+alt Успешное получение маркеров
+    MapService -> ExternalAPI : Запрос картографических данных
+    activate ExternalAPI
+    
+    alt Успешный запрос к API
+        ExternalAPI --> MapService : Возврат данных карты
+    else Ошибка API или сетевая ошибка
+        ExternalAPI --> MapService : Ошибка получения данных
+        MapService -> MapService : Логирование ошибки
+        MapService --> Controller : Сообщение об ошибке API
+        Controller --> WebServer : Код ошибки
+        WebServer --> Browser : HTTP ответ с кодом ошибки
+        Browser --> User : Сообщение о недоступности карт
+    end
+    deactivate ExternalAPI
+
+    MapService --> Controller : Подготовленные данные карты
+end
+deactivate MapService
+
+alt Успешная обработка данных
+    Controller --> WebServer : Данные для отображения
+    WebServer --> Browser : HTTP ответ с HTML/JS/CSS
+    Browser -> Browser : Рендеринг карты
+    Browser --> User : Отображение интерактивной карты
+else Ошибка обработки
+    Controller --> WebServer : Сообщение об ошибке
+    WebServer --> Browser : HTTP ответ с информацией об ошибке
+    Browser --> User : Отображение сообщения об ошибке
+end
+deactivate Controller
+deactivate WebServer
+deactivate Browser
+
+@enduml
