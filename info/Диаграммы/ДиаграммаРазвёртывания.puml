@@ -1,0 +1,38 @@
+@startuml Диаграмма развертывания OptiMoVe
+
+skinparam monochrome false
+skinparam shadowing true
+skinparam defaultFontName Arial
+skinparam defaultTextAlignment center
+
+' Определение устройств и узлов
+node "Сервер" as server {
+    artifact "Nginx" as nginx {
+        component "Балансировщик нагрузки" as loadbalancer
+    }
+    
+    node "Сервер приложений" as appserver {
+        artifact "Gunicorn" as gunicorn {
+            component "Приложение WebMap" as django
+        }
+        component "Workers [n]" as workers #lightgreen
+    }
+    
+    database "СУБД" as database {
+        artifact "База данных" as db
+    }
+}
+
+node "Компьютер (пользователя)" as client {
+    artifact "Веб-браузер" as browser {
+        component "Клиентский интерфейс" as clientUI
+    }
+}
+
+' Определение связей между компонентами
+browser -down-> nginx : "Отправляет запросы HTTP/HTTPS"
+nginx -down-> gunicorn : "Проксирует и балансирует запросы"
+gunicorn --> workers : "Распределяет задачи"
+workers -down-> database : "Выполняет SQL-запросы"
+
+@enduml
