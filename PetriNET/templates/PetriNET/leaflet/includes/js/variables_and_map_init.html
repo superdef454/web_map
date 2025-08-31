@@ -28,21 +28,7 @@ var lyrEsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/se
 let BusStops = L.layerGroup().addTo(map);
 let CitysLayer = L.markerClusterGroup().addTo(map);
 let RouteLayer = L.layerGroup().addTo(map);
-
-// Обработчик изменения масштаба карты
-map.on('zoomend', function() {
-    var currentZoom = map.getZoom();
-    // Управление видимостью маркеров в зависимости от уровня зума
-    if (currentZoom < 15 && BusStops.getLayers().length >= 1000) {
-        map.removeLayer(BusStops);
-        return
-    }
-    if (currentZoom < 11) {
-        map.removeLayer(BusStops);
-    } else {
-        map.addLayer(BusStops);
-    }
-});
+let DistrictLayer = L.layerGroup().addTo(map);
 
 // Настройки карты в правом окошке
 let Maps = {
@@ -53,6 +39,7 @@ let hide_view_groups = {
     "Города": CitysLayer,
     "Остановки": BusStops,
     "Маршруты": RouteLayer,
+    "Районы": DistrictLayer,
 }
 L.control.layers(Maps, hide_view_groups, { collapsed: false }).addTo(map);
 

@@ -65,6 +65,23 @@ class CityView(View):
             })
         response = {'error': 0}
         BSList = list(BusStop.objects.filter(city_id=city_id).values('name', 'latitude', 'longitude', 'id'))
+        
+        # Получаем данные о районах
+        Districts = District.objects.filter(city_id=city_id)
+        DistrictList = []
+        for district in Districts:
+            # Преобразуем полигон в GeoJSON формат
+            district_geojson = {
+                'id': district.id,
+                'name': district.name,
+                'description': district.description,
+                'geometry': {
+                    'type': 'Polygon',
+                    'coordinates': [[[coord[0], coord[1]] for coord in district.polygon.coords[0]]]
+                }
+            }
+            DistrictList.append(district_geojson)
+        
         Routes = Route.objects.filter(city_id=city_id).prefetch_related('busstop')
         RouteList = []
         for route in Routes:
@@ -82,7 +99,8 @@ class CityView(View):
         response.update(
             {
                 'BSList': BSList,
-                'RouteList': RouteList
+                'RouteList': RouteList,
+                'DistrictList': DistrictList
             }
         )
         return JsonResponse(response)

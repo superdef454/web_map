@@ -27,6 +27,7 @@ function UpdateCityData() {
         }
     BusStops.clearLayers();
     RouteLayer.clearLayers();
+    DistrictLayer.clearLayers();
     Routes = [];
     const csrftoken = getCookie('csrftoken');
     $.ajax({
@@ -38,12 +39,19 @@ function UpdateCityData() {
             city_id: CurrentCity.id,
         },
         success: function (data) {
-            JSON.parse(data).BSList.forEach(BS => {
+            const responseData = JSON.parse(data);
+            responseData.BSList.forEach(BS => {
                 AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
             });
-            JSON.parse(data).RouteList.forEach(Route => {
+            responseData.RouteList.forEach(Route => {
                 CreateRoute(Route.list_coord, Route.id, Route.name)
             });
+            // Добавляем районы на карту
+            if (responseData.DistrictList) {
+                responseData.DistrictList.forEach(District => {
+                    AddDistrict(District);
+                });
+            }
             $("#RouteAll").click();
         }
     });

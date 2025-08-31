@@ -1,0 +1,133 @@
+<script>
+// Функции для работы с районами
+
+// Глобальные переменные для районов
+let Districts = [];
+
+// Функция для добавления района на карту
+function AddDistrict(district) {
+    if (!district.geometry || !district.geometry.coordinates) {
+        console.warn('District has no geometry:', district);
+        return;
+    }
+    
+    try {
+        // Создаем полигон из координат GeoJSON
+        // Координаты в формате [longitude, latitude], но Leaflet ожидает [latitude, longitude]
+        const coordinates = district.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+        
+        const polygon = L.polygon(coordinates, {
+            color: '#0087ff',
+            weight: 2,
+            opacity: 0.8,
+            fillColor: '#0087ff',
+            fillOpacity: 0.1,
+            className: 'district-polygon'
+        });
+        
+        // Добавляем popup с информацией о районе
+        let popupContent = `<div class="district-popup">
+            <a href="{% url 'admin:index' %}PetriNET/district/${district.id}/change/"><h6><strong>${district.name}</strong></h6></a>`;
+        if (district.description) {
+            popupContent += `<p class="mb-0">${district.description}</p>`;
+        }
+        popupContent += `</div>`;
+        
+        polygon.bindPopup(popupContent);
+        
+        // Добавляем tooltip при наведении
+        polygon.bindTooltip(district.name, {
+            permanent: false,
+            direction: 'center',
+            className: 'district-tooltip'
+        });
+        
+        // Добавляем обработчики событий
+        polygon.on('mouseover', function(e) {
+            this.setStyle({
+                weight: 3,
+                fillOpacity: 0.2
+            });
+        });
+        
+        polygon.on('mouseout', function(e) {
+            this.setStyle({
+                weight: 2,
+                fillOpacity: 0.1
+            });
+        });
+        
+        // Сохраняем ссылку на объект района
+        polygon.districtData = district;
+        
+        // Добавляем полигон в слой районов
+        DistrictLayer.addLayer(polygon);
+        
+        // Сохраняем район в глобальном массиве
+        Districts.push({
+            id: district.id,
+            name: district.name,
+            description: district.description,
+            polygon: polygon
+        });
+        
+    } catch (error) {
+        console.error('Error creating district polygon:', error, district);
+    }
+}
+
+// Функция для очистки всех районов
+function ClearDistricts() {
+    DistrictLayer.clearLayers();
+    Districts = [];
+}
+
+// Функция для получения района по ID
+function GetDistrictById(id) {
+    return Districts.find(district => district.id === id);
+}
+
+// Функция для показа/скрытия районов
+function ToggleDistricts(show = true) {
+    if (show) {
+        if (!map.hasLayer(DistrictLayer)) {
+            map.addLayer(DistrictLayer);
+        }
+    } else {
+        if (map.hasLayer(DistrictLayer)) {
+            map.removeLayer(DistrictLayer);
+        }
+    }
+}
+
+// Функция для подсветки конкретного района
+function HighlightDistrict(districtId) {
+    const district = GetDistrictById(districtId);
+    if (district && district.polygon) {
+        district.polygon.setStyle({
+            color: '#ff0000',
+            weight: 4,
+            fillOpacity: 0.3
+        });
+        
+        // Центрируем карту на районе
+        map.fitBounds(district.polygon.getBounds());
+        
+        // Открываем popup
+        district.polygon.openPopup();
+    }
+}
+
+// Функция для сброса подсветки всех районов
+function ResetDistrictsHighlight() {
+    Districts.forEach(district => {
+        if (district.polygon) {
+            district.polygon.setStyle({
+                color: '#ff7800',
+                weight: 2,
+                fillOpacity: 0.1
+            });
+        }
+    });
+}
+</script>
