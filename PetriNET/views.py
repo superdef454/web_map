@@ -10,7 +10,32 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from PetriNET.petri_net_utils import CreateResponseFile, GetDataToCalculate, PetriNet
 from PetriNET.utils import auth_required
 
-from .models import City, BusStop, Route
+from .models import City, TC, BusStop, Route, EI
+from django.db.models import Count, Q
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
+
+from TransportMap.utils import (
+    ValidatedDjangoFilterBackend,
+    ValidatedSearchFilter,
+    ValidatedOrderingFilter,
+    ValidatedPageNumberPagination
+)
+
+from .serializers import (
+    CitySerializer,
+    TCSerializer, 
+    BusStopSerializer,
+    BusStopGeoSerializer,
+    RouteSerializer,
+    RouteDetailSerializer,
+    RouteCreateUpdateSerializer,
+    EISerializer
+)
 
 
 logger = logging.getLogger('PetriNetAPI')
@@ -194,3 +219,420 @@ def download_report_file(request):
     # Возвращаем URL для скачивания файла
     file_path = file_path
     return JsonResponse({'file_path': file_path})
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список городов",
+        description="Возвращает список всех городов с возможностью фильтрации и поиска",
+        tags=['Города']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию о городе",
+        description="Возвращает детальную информацию о конкретном городе",
+        tags=['Города']
+    ),
+    create=extend_schema(
+        summary="Создать новый город",
+        description="Создает новый город с указанными параметрами",
+        tags=['Города']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию о городе",
+        description="Полностью обновляет информацию о городе",
+        tags=['Города']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию о городе",
+        description="Частично обновляет информацию о городе",
+        tags=['Города']
+    ),
+    destroy=extend_schema(
+        summary="Удалить город",
+        description="Удаляет город из системы",
+        tags=['Города']
+    )
+)
+class CityViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с городами.
+    
+    Предоставляет CRUD операции для модели City.
+    Поддерживает фильтрацию по названию и координатам.
+    """
+    queryset = City.objects.all().order_by('name')
+    serializer_class = CitySerializer
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'name': ['exact', 'icontains'],
+        'latitude': ['exact', 'gte', 'lte'],
+        'longitude': ['exact', 'gte', 'lte'],
+    }
+    
+    search_fields = ['name']
+    ordering_fields = ['name', 'latitude', 'longitude', 'id']
+    ordering = ['name']
+    
+    pagination_class = ValidatedPageNumberPagination
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список типов транспорта",
+        description="Возвращает список всех типов транспортных средств",
+        tags=['Типы транспорта']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию о типе транспорта",
+        description="Возвращает детальную информацию о конкретном типе транспорта",
+        tags=['Типы транспорта']
+    ),
+    create=extend_schema(
+        summary="Создать новый тип транспорта",
+        description="Создает новый тип транспортного средства",
+        tags=['Типы транспорта']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию о типе транспорта",
+        description="Полностью обновляет информацию о типе транспорта",
+        tags=['Типы транспорта']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию о типе транспорта",
+        description="Частично обновляет информацию о типе транспорта",
+        tags=['Типы транспорта']
+    ),
+    destroy=extend_schema(
+        summary="Удалить тип транспорта",
+        description="Удаляет тип транспорта из системы",
+        tags=['Типы транспорта']
+    )
+)
+class TCViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с типами транспортных средств.
+    
+    Предоставляет CRUD операции для модели TC.
+    Поддерживает фильтрацию по названию и вместимости.
+    """
+    queryset = TC.objects.all().order_by('name')
+    serializer_class = TCSerializer
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'name': ['exact', 'icontains'],
+        'capacity': ['exact', 'gte', 'lte'],
+    }
+    
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'capacity', 'id']
+    ordering = ['name']
+    
+    pagination_class = ValidatedPageNumberPagination
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список остановок",
+        description="Возвращает список всех остановок с возможностью фильтрации",
+        tags=['Остановки']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию об остановке",
+        description="Возвращает детальную информацию о конкретной остановке",
+        tags=['Остановки']
+    ),
+    create=extend_schema(
+        summary="Создать новую остановку",
+        description="Создает новую остановку с указанными координатами",
+        tags=['Остановки']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию об остановке",
+        description="Полностью обновляет информацию об остановке",
+        tags=['Остановки']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию об остановке",
+        description="Частично обновляет информацию об остановке",
+        tags=['Остановки']
+    ),
+    destroy=extend_schema(
+        summary="Удалить остановку",
+        description="Удаляет остановку из системы",
+        tags=['Остановки']
+    )
+)
+class BusStopViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с остановками.
+    
+    Предоставляет CRUD операции для модели BusStop.
+    Поддерживает фильтрацию по городу, названию и координатам.
+    """
+    queryset = BusStop.objects.select_related('city').prefetch_related('route_set').order_by('name')
+    serializer_class = BusStopSerializer
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'city': ['exact'],
+        'city__name': ['exact', 'icontains'],
+        'name': ['exact', 'icontains'],
+        'latitude': ['exact', 'gte', 'lte'],
+        'longitude': ['exact', 'gte', 'lte'],
+    }
+    
+    search_fields = ['name', 'city__name']
+    ordering_fields = ['name', 'latitude', 'longitude', 'city__name', 'id']
+    ordering = ['name']
+    
+    pagination_class = ValidatedPageNumberPagination
+
+    @extend_schema(
+        summary="Получить остановки в формате GeoJSON",
+        description="Возвращает остановки в формате GeoJSON для отображения на карте",
+        parameters=[
+            OpenApiParameter(
+                name='city',
+                description='ID города для фильтрации',
+                required=False,
+                type=OpenApiTypes.INT
+            ),
+        ],
+        tags=['Остановки']
+    )
+    @action(detail=False, methods=['get'])
+    def geojson(self, request):
+        """Получить остановки в формате GeoJSON"""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = BusStopGeoSerializer(queryset, many=True)
+        
+        geojson_data = {
+            'type': 'FeatureCollection',
+            'features': serializer.data
+        }
+        
+        return Response(geojson_data)
+
+    @extend_schema(
+        summary="Получить маршруты остановки",
+        description="Возвращает список маршрутов, проходящих через данную остановку",
+        tags=['Остановки']
+    )
+    @action(detail=True, methods=['get'])
+    def routes(self, request, pk=None):
+        """Получить маршруты, проходящие через остановку"""
+        busstop = self.get_object()
+        routes = busstop.route_set.all()
+        serializer = RouteSerializer(routes, many=True)
+        return Response(serializer.data)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список маршрутов",
+        description="Возвращает список всех маршрутов с возможностью фильтрации",
+        tags=['Маршруты']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию о маршруте",
+        description="Возвращает детальную информацию о конкретном маршруте",
+        tags=['Маршруты']
+    ),
+    create=extend_schema(
+        summary="Создать новый маршрут",
+        description="Создает новый маршрут с указанными остановками",
+        tags=['Маршруты']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию о маршруте",
+        description="Полностью обновляет информацию о маршруте",
+        tags=['Маршруты']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию о маршруте",
+        description="Частично обновляет информацию о маршруте",
+        tags=['Маршруты']
+    ),
+    destroy=extend_schema(
+        summary="Удалить маршрут",
+        description="Удаляет маршрут из системы",
+        tags=['Маршруты']
+    )
+)
+class RouteViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с маршрутами.
+    
+    Предоставляет CRUD операции для модели Route.
+    Поддерживает фильтрацию по городу, типу транспорта и другим параметрам.
+    """
+    queryset = Route.objects.select_related('city', 'tc').prefetch_related('busstop').order_by('name')
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'city': ['exact'],
+        'city__name': ['exact', 'icontains'],
+        'tc': ['exact'],
+        'tc__name': ['exact', 'icontains'],
+        'name': ['exact', 'icontains'],
+        'interval': ['exact', 'gte', 'lte'],
+        'amount': ['exact', 'gte', 'lte'],
+    }
+    
+    search_fields = ['name', 'city__name', 'tc__name']
+    ordering_fields = ['name', 'interval', 'amount', 'city__name', 'tc__name', 'id']
+    ordering = ['name']
+    
+    pagination_class = ValidatedPageNumberPagination
+
+    def get_serializer_class(self):
+        """Возвращает соответствующий сериализатор в зависимости от действия"""
+        if self.action == 'retrieve':
+            return RouteDetailSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return RouteCreateUpdateSerializer
+        return RouteSerializer
+
+    @extend_schema(
+        summary="Получить остановки маршрута",
+        description="Возвращает список остановок для данного маршрута в правильном порядке",
+        tags=['Маршруты']
+    )
+    @action(detail=True, methods=['get'])
+    def busstops(self, request, pk=None):
+        """Получить остановки маршрута"""
+        route = self.get_object()
+        busstops = route.busstop.all()
+        serializer = BusStopSerializer(busstops, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Получить маршруты по городу",
+        description="Возвращает все маршруты для указанного города",
+        parameters=[
+            OpenApiParameter(
+                name='city_id',
+                description='ID города',
+                required=True,
+                type=OpenApiTypes.INT
+            ),
+        ],
+        tags=['Маршруты']
+    )
+    @action(detail=False, methods=['get'])
+    def by_city(self, request):
+        """Получить маршруты по городу"""
+        city_id = request.query_params.get('city_id')
+        if not city_id:
+            return Response(
+                {'error': 'Параметр city_id обязателен'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            city_id = int(city_id)
+        except ValueError:
+            return Response(
+                {'error': 'Параметр city_id должен быть числом'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        routes = self.get_queryset().filter(city_id=city_id)
+        
+        # Применяем фильтры и пагинацию
+        routes = self.filter_queryset(routes)
+        page = self.paginate_queryset(routes)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(routes, many=True)
+        return Response(serializer.data)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список единиц измерения",
+        description="Возвращает список всех единиц измерения",
+        tags=['Единицы измерения']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию о единице измерения",
+        description="Возвращает детальную информацию о конкретной единице измерения",
+        tags=['Единицы измерения']
+    ),
+    create=extend_schema(
+        summary="Создать новую единицу измерения",
+        description="Создает новую единицу измерения",
+        tags=['Единицы измерения']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию о единице измерения",
+        description="Полностью обновляет информацию о единице измерения",
+        tags=['Единицы измерения']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию о единице измерения",
+        description="Частично обновляет информацию о единице измерения",
+        tags=['Единицы измерения']
+    ),
+    destroy=extend_schema(
+        summary="Удалить единицу измерения",
+        description="Удаляет единицу измерения из системы",
+        tags=['Единицы измерения']
+    )
+)
+class EIViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с единицами измерения.
+    
+    Предоставляет CRUD операции для модели EI.
+    Поддерживает фильтрацию и поиск по названию.
+    """
+    queryset = EI.objects.all().order_by('name')
+    serializer_class = EISerializer
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'name': ['exact', 'icontains'],
+        'short_name': ['exact', 'icontains'],
+    }
+    
+    search_fields = ['name', 'short_name']
+    ordering_fields = ['name', 'short_name', 'id']
+    ordering = ['name']
+    
+    pagination_class = ValidatedPageNumberPagination

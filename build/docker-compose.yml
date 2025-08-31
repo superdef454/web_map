@@ -1,0 +1,57 @@
+name: web_map
+
+networks:
+  default:
+
+services:
+  optimove:
+    build: 
+      context: ..
+      dockerfile: build/Dockerfile
+    restart: always
+    ports:
+      - "82:8080"
+    depends_on:
+      postgre:
+        condition: service_healthy
+    volumes:
+      - ../:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    command: >
+      bash -c "python manage.py migrate && python manage.py collectstatic --no-input &&
+           gunicorn -c ./build/gunicorn.conf.py TransportMap.wsgi:application & nginx -g 'daemon off;'"
+    env_file:
+      - ../.env
+    environment:
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=postgre
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=OptiMoVe
+    networks:
+      - default
+
+  postgre:
+  # нужно активировать расширение postgis если база уже была создана ранее: build/postgres-init/01-init-postgis.sql
+    image: postgis/postgis:13-3.3
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=OptiMoVe
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5435:5432"
+    networks:
+      - default
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

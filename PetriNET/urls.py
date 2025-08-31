@@ -1,13 +1,25 @@
 from django.urls import path
 from .views import (
-    BusStopView, Calculate, CityView, MainMap, RouteView, download_report_file
+    BusStopView, Calculate, CityView, MainMap, RouteView, download_report_file, CityViewSet, TCViewSet, BusStopViewSet, RouteViewSet, EIViewSet
 )
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
 
 app_name = 'PetriNET'
 
+# Создаем роутер для API
+api_router = DefaultRouter()
+api_router.register(r'cities', CityViewSet, basename='city')
+api_router.register(r'transport-types', TCViewSet, basename='tc')
+api_router.register(r'busstops', BusStopViewSet, basename='busstop')
+api_router.register(r'routes', RouteViewSet, basename='route')
+# api_router.register(r'measurement-units', EIViewSet, basename='ei')
+
+
 urlpatterns = [
     path('', MainMap.as_view(), name='main_map'),
+    path('api/', include(api_router.urls)),
     path('ajax/city/get', CityView.as_view(), name='get_city_data'),
     path('ajax/BS/add', BusStopView.as_view(), name='create_bs'),
     path('ajax/BS/get', BusStopView.as_view(), name='get_bs'),

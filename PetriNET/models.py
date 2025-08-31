@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.forms import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -50,8 +51,8 @@ class BusStop(models.Model):
         max_digits=9,  # Максимальное количество цифр всего (включая знаки после запятой)
         decimal_places=5,  # Количество знаков после запятой
         validators=[
-            MinValueValidator(-90.0),
-            MaxValueValidator(90.0)
+            MinValueValidator(Decimal('-90.0')),
+            MaxValueValidator(Decimal('90.0'))
         ]
     )
     longitude = models.DecimalField(
@@ -59,8 +60,8 @@ class BusStop(models.Model):
         max_digits=10,  # Учитывая, что долгота может быть от -180 до 180
         decimal_places=5,
         validators=[
-            MinValueValidator(-180.0),
-            MaxValueValidator(180.0)
+            MinValueValidator(Decimal('-180.0')),
+            MaxValueValidator(Decimal('180.0'))
         ]
     )
 
