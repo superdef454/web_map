@@ -2,10 +2,12 @@ import datetime
 import logging
 import os
 import random
+
 from docx import Document
 from docx.shared import Pt
-from geopy import distance
 from faker import Faker
+from geopy import distance
+
 from .models import BusStop, City, Route
 
 logger = logging.getLogger('PetriNetManager')
@@ -88,13 +90,13 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     return DataToCalculate
 
 
-def GetTravelTime(latitude_start: float, longitude_start: float,
+def get_travel_time(latitude_start: float, longitude_start: float,
                   latitude_end: float, longitude_end: float) -> int:
     # Написать функцию получения времени, за которое автобус проедет расстояние между остановками в секундах
     return 60 * 3
 
 
-def GetTravelRange(latitude_start: float, longitude_start: float,
+def get_travel_range(latitude_start: float, longitude_start: float,
                    latitude_end: float, longitude_end: float) -> int:
     """Нахождение расстояния между координатами в км"""
     return distance.distance((latitude_start, longitude_start), (latitude_end, longitude_end)).km
@@ -158,7 +160,7 @@ class PetriNet():
             """Возвращает время, требуемое на дорогу до следующей остановки"""
             start_index = self.bus_stop_index_now
             end_index = start_index - 1 if self.ending_station() else start_index + 1
-            return GetTravelTime(
+            return get_travel_time(
                 self.route_list[start_index]["latitude"],
                 self.route_list[start_index]["longitude"],
                 self.route_list[end_index]["latitude"],
@@ -500,7 +502,7 @@ class PetriNet():
                 if not last_bus_stop:
                     last_bus_stop = now_bus_stop
                     continue
-                add_route['route_length'] += GetTravelRange(
+                add_route['route_length'] += get_travel_range(
                     last_bus_stop.latitude,
                     last_bus_stop.longitude,
                     now_bus_stop.latitude,

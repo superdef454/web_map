@@ -27,6 +27,8 @@ from .models import EI, TC, BusStop, City, District, Route
 from .serializers import (
     BusStopGeoSerializer,
     BusStopSerializer,
+    CalculationRequestSerializer,
+    CalculationResponseSerializer,
     CitySerializer,
     DistrictGeoSerializer,
     DistrictSerializer,
@@ -690,3 +692,87 @@ class DistrictViewSet(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = DistrictGeoSerializer(queryset, many=True)
         return Response(serializer.data)
+
+
+@extend_schema_view(
+    calculate=extend_schema(
+        summary="Расчёт нагрузки транспортной сети",
+        description="Выполняет расчёт нагрузки транспортной сети на основе переданных данных о маршрутах, "
+                   "остановках и параметрах транспортных средств. Возвращает результаты расчёта и данные для отчёта.",
+        request=CalculationRequestSerializer,
+        responses={
+            200: CalculationResponseSerializer,
+            400: 'Ошибка в данных для расчёта',
+            500: 'Ошибка при выполнении расчёта'
+        },
+        tags=['Расчёты']
+    )
+)
+class CalculationViewSet(viewsets.GenericViewSet):
+    """
+    ViewSet для выполнения расчётов нагрузки транспортной сети.
+    
+    Предоставляет endpoint для расчёта нагрузки на основе данных о маршрутах,
+    остановках и параметрах транспортных средств.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = CalculationRequestSerializer
+    
+    @extend_schema(
+        summary="Выполнить расчёт нагрузки",
+        description="Принимает данные для расчёта нагрузки транспортной сети и возвращает результаты расчёта",
+        request=CalculationRequestSerializer,
+        responses={200: CalculationResponseSerializer}
+    )
+    @action(detail=False, methods=['post'])
+    def calculate(self, request):
+        """Выполнение расчёта нагрузки транспортной сети"""
+        serializer = CalculationRequestSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                'error': 1,
+                'error_message': 'Ошибка валидации данных',
+                'details': serializer.errors
+            }, status=400)
+        
+        response = {'error': 0}
+        
+        try:
+            data_to_calculate_raw = serializer.validated_data['DataToCalculate']
+            logger.info(f"Данные для разбора: {data_to_calculate_raw}")
+            data_to_calculate = GetDataToCalculate(data_to_calculate_raw)
+        except Exception as e:
+            logger.exception("Ошибка получения данных для расчёта")
+            return Response({
+                'error': 1,
+                'error_message': 'Ошибка заполнения данных',
+                'details': str(e)
+            }, status=400)
+        else:
+            logger.info(f"Данные для расчёта: {data_to_calculate}")
+
+        try:
+            petri_net = PetriNet(data_to_calculate)
+            calculate_result = petri_net.Calculation()
+            data_to_report = petri_net.CreateDataToReport()
+        except Exception as e:
+            logger.exception("Ошибка расчёта нагрузки")
+            return Response({
+                'error': 2,
+                'error_message': 'Ошибка расчёта нагрузки',
+                'details': str(e)
+            }, status=500)
+
+        response.update({
+            'calculate': calculate_result,
+            'data_to_report': data_to_report,
+        })
+
+        # Сериализуем ответ для документации
+        response_serializer = CalculationResponseSerializer(data=response)
+        if response_serializer.is_valid():
+            return Response(response_serializer.validated_data)
+        else:
+            # Если есть проблемы с сериализацией ответа, возвращаем как есть
+            return Response(response)

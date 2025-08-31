@@ -216,3 +216,75 @@ class DistrictGeoSerializer(GeoFeatureModelSerializer):
         fields = [
             'id', 'name', 'city', 'city_name', 'description'
         ]
+
+
+class CalculationRequestSerializer(serializers.Serializer):
+    """Сериализатор для запроса расчета нагрузки транспортной сети"""
+    
+    DataToCalculate = serializers.JSONField(
+        help_text="Данные для расчета нагрузки в формате JSON. "
+                  "Должны содержать информацию о маршрутах, остановках, "
+                  "параметрах транспортных средств и временных интервалах."
+    )
+    
+    def validate_data_to_calculate(self, value):
+        """Валидация данных для расчета"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError(
+                "DataToCalculate должно быть JSON-объектом"
+            )
+        
+        # Проверяем наличие обязательных полей
+        required_fields = ['routes', 'transport_params']
+        for field in required_fields:
+            if field not in value:
+                error_msg = f"Отсутствует обязательное поле: {field}"
+                raise serializers.ValidationError(error_msg)
+        
+        return value
+
+
+class CalculationResultDataSerializer(serializers.Serializer):
+    """Сериализатор для данных результата расчета"""
+    
+    route_id = serializers.IntegerField(help_text="ID маршрута")
+    route_name = serializers.CharField(help_text="Название маршрута")
+    load_factor = serializers.FloatField(help_text="Коэффициент загрузки")
+    passenger_flow = serializers.IntegerField(help_text="Пассажиропоток")
+    vehicle_count = serializers.IntegerField(help_text="Количество транспортных средств")
+    interval = serializers.FloatField(help_text="Интервал движения в минутах")
+
+
+class ReportDataSerializer(serializers.Serializer):
+    """Сериализатор для данных отчета"""
+    
+    calculation_date = serializers.DateTimeField(help_text="Дата и время расчета")
+    total_routes = serializers.IntegerField(help_text="Общее количество маршрутов")
+    avg_load_factor = serializers.FloatField(help_text="Средний коэффициент загрузки")
+    total_passenger_flow = serializers.IntegerField(help_text="Общий пассажиропоток")
+    routes_data = CalculationResultDataSerializer(
+        many=True, 
+        help_text="Детальные данные по каждому маршруту"
+    )
+
+
+class CalculationResponseSerializer(serializers.Serializer):
+    """Сериализатор для ответа на запрос расчета нагрузки"""
+    
+    error = serializers.IntegerField(
+        help_text="Код ошибки (0 - успех, 1 - ошибка данных, 2 - ошибка расчета)"
+    )
+    error_message = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Сообщение об ошибке (если error != 0)"
+    )
+    calculate = CalculationResultDataSerializer(
+        many=True,
+        required=False,
+        help_text="Результаты расчета по маршрутам"
+    )
+    data_to_report = ReportDataSerializer(
+        required=False,
+        help_text="Данные для формирования отчета"
+    )

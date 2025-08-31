@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    BusStopView, Calculate, CityView, MainMap, RouteView, download_report_file, 
+    BusStopView, Calculate, CalculationViewSet, CityView, MainMap, RouteView, download_report_file, 
     CityViewSet, TCViewSet, BusStopViewSet, RouteViewSet, EIViewSet, DistrictViewSet
 )
 from django.urls import path, include
@@ -16,6 +16,7 @@ api_router.register(r'transport-types', TCViewSet, basename='tc')
 api_router.register(r'busstops', BusStopViewSet, basename='busstop')
 api_router.register(r'routes', RouteViewSet, basename='route')
 api_router.register(r'districts', DistrictViewSet, basename='district')
+api_router.register(r'calculations', CalculationViewSet, basename='calculation')
 # api_router.register(r'measurement-units', EIViewSet, basename='ei')
 
 
