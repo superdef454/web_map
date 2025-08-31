@@ -1,0 +1,154 @@
+<script>
+// Обработчики событий интерфейса
+
+// Кнопка добавления остановки
+$("#BusStopAdd").click(function () {
+    $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
+    if (!CityExists()) {
+        return
+    }
+    let BusStopName = $("#BusStopName").val()
+    if (BusStopName) {
+        if (ActionOnClick == 'AddTempMarker' && typeof TempMarker !== "undefined" && TempMarker !== null) {
+            $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
+            $(this).text('+');
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '{% url "PetriNET:create_bs" %}',
+                method: 'post',
+                dataType: 'html',
+                headers: { 'X-CSRFToken': csrftoken },
+                data: {
+                    name: BusStopName,
+                    lat: TempMarker.getLatLng().lat,
+                    lng: TempMarker.getLatLng().lng,
+                    city_id: CurrentCity.id,
+                },
+                success: function (data) {
+                    if (JSON.parse(data).error == 0) {
+                        latlng = [TempMarker.getLatLng().lat, TempMarker.getLatLng().lng]
+                        AddBS(latlng, JSON.parse(data).BusStop.id, BusStopName);
+                        CloseAllAction();
+                    }
+                    else {
+                        CloseAllAction();
+                        alert("Ошибка добавления остановки\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_message)
+                    }
+                },
+                error: function (jqXHR, exception) {
+                    CloseAllAction();
+                    alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+                }
+            });
+            return
+        };
+        if (ActionOnClick == 'AddTempMarker') {
+            CloseAllAction();
+            return
+        }
+        $(this).removeClass('btn-success btn-primary').addClass('btn-danger');
+        $(this).text('x');
+        ActionOnClick = 'AddTempMarker'
+    }
+    else {
+        alert('Введите название остановки!');
+    }
+});
+
+// Кнопка добавления маршрута
+$("#RouteAdd").click(function () {
+    $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
+    if (!CityExists()) {
+        return
+    }
+    if (ActionOnClick == 'AddTempRoute' && typeof TempRoute !== "undefined" && TempRoute !== null) {
+        $(this).removeClass('btn-danger btn-success').addClass('btn-primary');
+        $(this).text('+');
+        const csrftoken = getCookie('csrftoken');
+        $.ajax({
+            url: '{% url "PetriNET:create_route" %}',
+            method: 'post',
+            dataType: 'html',
+            headers: { 'X-CSRFToken': csrftoken },
+            data: {
+                list_coord: JSON.stringify(TempRouteList),
+                name: "Изменить название маршрута",
+                city_id: CurrentCity.id,
+            },
+            success: function (data) {
+                if (JSON.parse(data).error == 0) {
+                    CreateRoute(JSON.parse(data).Route.list_coord, JSON.parse(data).Route.id, JSON.parse(data).Route.name)
+                    $("#RouteAll").click();
+                }
+                else {
+                    alert("Ошибка добавления маршрута\nОтвет сервера: " + JSON.parse(data).error + ' ' + JSON.parse(data).error_message)
+                }
+            },
+            error: function (jqXHR, exception) {
+                alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+            }
+        })
+        CloseAllAction();
+        return
+    };
+    if (ActionOnClick == 'AddTempRoute') {
+        CloseAllAction();
+        return
+    }
+    RouteLayer.clearLayers();
+    $(this).removeClass('btn-primary btn-success').addClass('btn-danger');
+    $(this).text('x');
+    ActionOnClick = 'AddTempRoute'
+});
+
+// Отображение модального окна выбора маршрута
+$("#RouteOne").click(function () {
+    if (!CityExists()) {
+        return
+    }
+    let modal = $("#ChoiceRoute")
+    let body = modal.find(".modal-body")
+    if (Routes.length > 0) {
+        body.html(`
+        <div class="d-flex justify-content-center flex-wrap bd-highlight">
+        `)
+        Routes.forEach((route, index) => {
+            body.append(`<div type="button" class="btn btn-primary bd-highlight mb-3 mr-3" onclick="ChoiceOneRoute(${route.id})">${index + 1}: ${route.name}</div>`)
+        })
+        body.append(`
+        </div>
+        `)
+    }
+    else {
+        body.html('<p>Маршрутов нет</p>')
+    }
+    modal.modal('show')
+})
+
+// Обработка кнопки Из файла
+$('#FilePetriButton').on('click', function () {
+    if (!CityExists()) {
+        return
+    }
+    $('#FilePetri').trigger('click');
+});
+
+// Обработка двойного клика на карте
+map.on('dblclick', (event) => {
+    if (ActionOnClick == 'AddTempMarker') {
+        if (TempMarker) {
+            TempMarker.remove()
+        }
+        TempMarker = L.marker([event.latlng.lat, event.latlng.lng], { opacity: 0.5, draggable: true }).addTo(map).on('click', (event) => {
+            CloseAllAction();
+        })
+        $("#BusStopAdd").removeClass('btn-danger btn-primary').addClass('btn-success');
+        $("#BusStopAdd").text('✓');
+    }
+})
+
+// Инициализация селектора
+$(document).ready(function() {
+    $('.selectpicker').selectpicker();
+});
+</script>

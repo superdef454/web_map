@@ -1,7 +1,18 @@
 from django.contrib import admin
+from django.contrib.admin import StackedInline
 from django.contrib.gis.admin import GISModelAdmin
+from django.contrib.gis.db import models as gis_models
+from django.contrib.gis.forms.widgets import OSMWidget
 from django.core.management import call_command
-from .models import City, BusStop, Route, TC, District
+
+from .models import TC, BusStop, City, District, Route
+
+
+class GISStackedInline(StackedInline):
+    """StackedInline с поддержкой геоданных"""
+    formfield_overrides = {
+        gis_models.PolygonField: {'widget': OSMWidget},
+    }
 
 
 @admin.register(Route)
@@ -36,6 +47,7 @@ class DistrictAdmin(GISModelAdmin):
     list_filter = ('city',)
     search_fields = ('name', 'city__name')
     ordering = ('city__name', 'name')
+    raw_id_fields = ('city',)
     
     # Настройки для карты
     default_zoom = 12
@@ -52,11 +64,11 @@ class DistrictAdmin(GISModelAdmin):
     )
 
 
-class DistrictInline(admin.TabularInline):
+class DistrictInline(GISStackedInline):
     """Инлайн для отображения районов на странице города"""
     model = District
     extra = 0
-    fields = ('name', 'description')
+    fields = ('name', 'description', 'polygon')
     readonly_fields = ()
 
 

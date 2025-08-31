@@ -1,0 +1,86 @@
+<script>
+// Функции для работы с городами
+
+// Прекращение выполнений действий добавления
+function CloseAllAction() {
+    if (TempRoute) {
+        TempRoute.remove();
+    }
+    TempRoute = null;
+    TempRouteList = [];
+    ActionOnClick = "";
+    $("#RouteAdd").removeClass('btn-danger btn-success').addClass('btn-primary');
+    $("#RouteAdd").text('+');
+    if (TempMarker) {
+        TempMarker.remove();
+    }
+    TempMarker = null;
+    ActionOnClick = "";
+    $("#BusStopName").val('');
+    $("#BusStopAdd").removeClass('btn-danger btn-success').addClass('btn-primary');
+    $("#BusStopAdd").text('+');
+}
+
+function UpdateCityData() {
+    if (!CurrentCity) {
+            return
+        }
+    BusStops.clearLayers();
+    RouteLayer.clearLayers();
+    Routes = [];
+    const csrftoken = getCookie('csrftoken');
+    $.ajax({
+        url: '{% url "PetriNET:get_city_data" %}',
+        method: 'get',
+        dataType: 'html',
+        headers: { 'X-CSRFToken': csrftoken },
+        data: {
+            city_id: CurrentCity.id,
+        },
+        success: function (data) {
+            JSON.parse(data).BSList.forEach(BS => {
+                AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
+            });
+            JSON.parse(data).RouteList.forEach(Route => {
+                CreateRoute(Route.list_coord, Route.id, Route.name)
+            });
+            $("#RouteAll").click();
+        }
+    });
+}
+
+// Выбор города, запрос к бд для получения данных города и его маршрутов
+function ChoiceCity(id) {
+    let CityID = id
+    let City = citys.find(el => el.id == CityID)
+    let CityCircle = CitysLayer.getLayers().find(layer => layer.getLatLng().lat == City.latitude && layer.getLatLng().lng == City.longitude)
+    CityCircle.closePopup();
+    map.setView([City.latitude, City.longitude], 12);
+    if (CurrentCity !== City) {
+        CloseAllAction();
+        if (CurrentCity) {
+            Reset()
+        }
+        CurrentCity = City;
+        $('#dropdownMenuButton').val(id);
+        $('#dropdownMenuButton').selectpicker('refresh')
+        UpdateCityData()
+    }
+}
+
+function ChangeCityOnSelect(selectObject) {
+    var value = selectObject.value;
+    if (value == "0") {
+        const link = document.createElement('a');
+        url = "{% url 'admin:index' %}"
+        link.href = url;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    if (value) {
+        ChoiceCity(value)
+    }
+}
+</script>

@@ -1,0 +1,85 @@
+<script>
+// Функции для работы с маршрутами
+
+// Добавление маршрута в список
+function CreateRoute(list_coord, id, name) {
+    Routes.push({
+        "list_coord": list_coord,
+        "id": id,
+        "name": name
+    })
+}
+
+// Добавление маршрутов в группу маршрутов на карту
+function DrawRoute(route) {
+    RouteLayer.addLayer(L.polyline(route.list_coord, {
+        // color: arrayRandElement(ListColor),
+        weight: 6,
+        fillOpacity: 0.2,
+    }).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/route/${route.id}/change/"><p>${route.name}</p></a>`));
+}
+
+// Показать все маршруты
+function ShowAllRoutes() {
+    if (!CityExists()) {
+        return
+    }
+    RouteLayer.clearLayers();
+    Routes.forEach(route => {
+        DrawRoute(route)
+    })
+}
+
+// Отображение одного маршрута
+function ChoiceOneRoute(id) {
+    if (!CityExists()) {
+        return
+    }
+    route = Routes.find(route => route.id == id)
+    if (route) {
+        RouteLayer.clearLayers();
+        DrawRoute(route);
+        $("#ChoiceRoute").modal('hide');
+    }
+    else {
+        alert("Маршрут не найден!")
+    }
+}
+
+// Функция обработки нажатия кнопок маршрутов
+function RouteCheck(id) {
+    btn = $('#RouteCheckbox' + id)
+    route = Routes.find(route => route.id == id)
+    if (!route) {
+        alert("Маршрут не найден!")
+        return
+    }
+    if (!btn.hasClass('active')) {
+        RoutesForCalculate.push(route)
+    }
+    else {
+        let include = -1
+        RoutesForCalculate.forEach((item, index) => {
+            if (item.id == id) {
+                include = index
+            }
+        })
+        if (include >= 0) {
+            RoutesForCalculate.splice(include, 1);
+        }
+    }
+    DrawRoutsForCalculate()
+}
+
+function DrawRoutsForCalculate() {
+    if (RoutesForCalculate.length > 0) {
+        RouteLayer.clearLayers();
+        RoutesForCalculate.forEach((route, index) => {
+            DrawRoute(route);
+        })
+    }
+    else {
+        ShowAllRoutes()
+    }
+}
+</script>

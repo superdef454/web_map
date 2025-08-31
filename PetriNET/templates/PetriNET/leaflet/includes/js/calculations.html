@@ -1,0 +1,167 @@
+<script>
+// Функции для расчетов и работы с данными
+
+// Функция заполнения окна Выбрать маршруты
+function SetChoiceRouteForCalculate() {
+    let modal = $("#ChoiceRouteForCalculate")
+    let body = modal.find(".modal-body")
+    if (body.html().trim() !== '') {}
+    else if (Routes.length > 0) {
+        body.html(`
+        <div class="d-flex justify-content-center flex-wrap bd-highlight">
+        `)
+        Routes.forEach((route, index) => {
+            body.append(`
+                <button id="RouteCheckbox${route.id}" type="button" class="btn btn-primary bd-highlight mb-3 mr-3" data-toggle="button" aria-pressed="false"
+                onclick="RouteCheck(${route.id});">
+                ${index + 1}: ${route.name}
+                </button>
+            `)
+        })
+        body.append(`
+        </div>
+        `)
+    }
+    else {
+        body.html('<p>Маршрутов нет</p>')
+    }
+    // Отрисовать только нужные маршруты
+    DrawRoutsForCalculate()
+}
+
+// Обработка кнопки Выбрать маршруты
+function RoutesChoose() {
+    if (!CityExists()) {
+        return
+    }
+    if (RoutesForCalculate.length > 0) {
+        RouteLayer.clearLayers();
+        RoutesForCalculate.forEach((route, index) => {
+            DrawRoute(route);
+        })
+    }
+    let modal = $("#ChoiceRouteForCalculate")
+    let body = modal.find(".modal-body")
+    SetChoiceRouteForCalculate()
+    modal.modal('show')
+}
+
+// Формирование данных для сохранения в файл / отправки на сервер
+function CreateDataToCalculate() {
+    if (!CheckDataToCalculateExists()) {
+        return null
+    }
+    DataToCalculate = {
+        "routes": RoutesForCalculate.map(({ id, name }) => ({ id, name })),
+        "busstops": BSPassengersDirections,
+        "city_id": CurrentCity.id,
+    }
+    return DataToCalculate
+}
+
+// Функция Скачивания данных для расчёта
+function DownloadDataToCalculate() {
+    if (!CityExists()) {
+        return
+    }
+    DataToCalculate = CreateDataToCalculate()
+    if (DataToCalculate == null) {
+        return
+    }
+    // Преобразование данных в строку JSON
+    const dataStr = JSON.stringify(DataToCalculate);
+    // Создание Blob объекта с типом данных JSON
+    const blob = new Blob([dataStr], { type: "application/json" });
+    // Создание URL для Blob объекта
+    const url = URL.createObjectURL(blob);
+
+    // Создание временной ссылки для скачивания
+    const link = document.createElement('a');
+    Data = new Date();
+    Data.setMilliseconds(0)
+    link.download = `DataToCalculate_${Data.toLocaleDateString()}_${Data.toLocaleTimeString()}.json`; // Имя файла для скачивания
+    link.href = url;
+    link.style.display = 'none'; // Скрытие ссылки
+
+    // Добавление ссылки к документу и её активация для начала скачивания
+    document.body.appendChild(link);
+    link.click();
+
+    // Очистка ресурсов после скачивания
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+
+// Обработка кнопки Сброс
+function Reset() {
+    // Сбросить выбор маршрутов
+    let modal = $("#ChoiceRouteForCalculate")
+    let body = modal.find(".modal-body")
+    body.html('')
+    CloseAllAction()
+    RoutesForCalculate = []
+    BSPassengersDirections = {}
+    map.closePopup()
+    ShowAllRoutes()
+}
+
+// Обработка кнопки Расчёт
+function Сalculation() {
+    if (!CityExists()) {
+        return
+    }
+    DataToCalculate = CreateDataToCalculate()
+    if (DataToCalculate == null) {
+        return
+    }
+    const csrftoken = getCookie('csrftoken');
+    $.ajax({
+        url: '{% url "PetriNET:load_calculation" %}',
+        method: 'post',
+        dataType: 'html',
+        headers: { 'X-CSRFToken': csrftoken },
+        data: {
+            "DataToCalculate": JSON.stringify(DataToCalculate),
+        },
+        success: function (data) {
+            data_from_server = JSON.parse(data)
+            analysis_of_calculation_result(data_from_server)
+        },
+        error: function (jqXHR, exception) {
+            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+        }
+    });
+}
+
+// Разбор файла пользователя
+function PetriFileProcess(files) {
+    if (files.length > 0) {
+        let file = files[0];
+        if (file.type == 'application/json') {
+            Reset()
+            let reader = new FileReader();
+            reader.onload = function (e) {
+                let DataToCalculate = JSON.parse(e.target.result)
+                try {
+                    if (DataToCalculate.city_id != CurrentCity.id) {
+                        throw `Не правильно выбран город. Нужно: ${DataToCalculate.city_id}, ваш: ${CurrentCity.id}`;
+                    }
+                    BSPassengersDirections = DataToCalculate.busstops
+                    RoutesForCalculate = Routes.filter(route =>
+                        DataToCalculate.routes.some(rout => rout.id == route.id)
+                    );
+                    SetChoiceRouteForCalculate()
+                    RoutesForCalculate.forEach((route, index) => {
+                        $(`#RouteCheckbox${route.id}`).addClass("active").attr('aria-pressed="true"')
+                    })
+                } catch (e) {
+                    Reset()
+                    alert(e)
+                }
+            };
+            reader.readAsText(file);
+        }
+        $("#FilePetri").val(null);
+    }
+}
+</script>

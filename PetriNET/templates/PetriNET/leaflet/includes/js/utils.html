@@ -1,0 +1,58 @@
+<script>
+// Утилитные функции
+
+// Получение ключа сервера
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Функция проверки выбора города
+function CityExists() {
+    if (CurrentCity) {
+        return true
+    }
+    else {
+        alert('Выберите город');
+        return false
+    }
+}
+
+// Функция проверки заполнения данных для расчёта
+function CheckDataToCalculateExists() {
+    if (RoutesForCalculate.length == 0) {
+        alert('Не выбраны маршруты для расчёта!');
+        return false
+    }
+    if (Object.keys(BSPassengersDirections).length == 0) {
+        alert('Отсутствуют пассажиры на остановках!');
+        return false
+    }
+    return true
+}
+
+// Функция получения часов из секунд
+function formatTime(seconds) {
+    var hours = Math.floor(seconds / 3600); // Получаем количество часов
+    var minutes = Math.floor((seconds % 3600) / 60); // Получаем количество минут
+    var seconds = seconds % 60; // Получаем оставшиеся секунды
+
+    // Добавляем ведущие нули, если необходимо
+    var hoursFormatted = hours.toString().padStart(2, '0');
+    var minutesFormatted = minutes.toString().padStart(2, '0');
+    var secondsFormatted = seconds.toString().padStart(2, '0');
+
+    // Собираем итоговую строку времени
+    return '(' + hoursFormatted + ':' + minutesFormatted + ':' + secondsFormatted + ')';
+}
+</script>

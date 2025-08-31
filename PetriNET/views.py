@@ -1,44 +1,41 @@
 import json
 import logging
 from typing import Any
+
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from PetriNET.petri_net_utils import CreateResponseFile, GetDataToCalculate, PetriNet
 from PetriNET.utils import auth_required
-
-from .models import City, TC, BusStop, Route, EI, District
-from django.db.models import Count, Q
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
-
 from TransportMap.utils import (
     ValidatedDjangoFilterBackend,
-    ValidatedSearchFilter,
     ValidatedOrderingFilter,
-    ValidatedPageNumberPagination
+    ValidatedPageNumberPagination,
+    ValidatedSearchFilter,
 )
 
+from .models import EI, TC, BusStop, City, District, Route
 from .serializers import (
-    CitySerializer,
-    TCSerializer, 
-    BusStopSerializer,
     BusStopGeoSerializer,
-    RouteSerializer,
-    RouteDetailSerializer,
-    RouteCreateUpdateSerializer,
-    EISerializer,
+    BusStopSerializer,
+    CitySerializer,
+    DistrictGeoSerializer,
     DistrictSerializer,
-    DistrictGeoSerializer
+    EISerializer,
+    RouteCreateUpdateSerializer,
+    RouteDetailSerializer,
+    RouteSerializer,
+    TCSerializer,
 )
-
 
 logger = logging.getLogger('PetriNetAPI')
 

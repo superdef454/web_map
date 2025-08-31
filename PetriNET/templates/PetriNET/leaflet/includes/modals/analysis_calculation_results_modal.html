@@ -1,0 +1,18 @@
+<!-- Модальное окно отображения результатов расчёта-->
+<div class="modal fade" id="AnalysisOfCalculationResults" tabindex="-1"
+    aria-labelledby="AnalysisOfCalculationResultsTitle" style="display: none;" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ChoiceRouteTitle">Результат расчёта</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт <i class="fa-solid fa-download"></i></button>
+                <button class="btn btn-primary" data-dismiss="modal" type="button" onclick="simulation()">Имитировать работу онлайн</button>
+            </div>
+        </div>
+    </div>
+</div>

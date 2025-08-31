@@ -1,0 +1,87 @@
+{% load static %}
+<script>
+// Глобальные переменные
+let CurrentCity
+let Routes = []
+
+// Переменные для добавления данных
+let ActionOnClick = ""
+let TempMarker
+let TempRoute
+let TempRouteList = []
+
+let EI = "Людей"
+
+// Переменные для расчёта
+let RoutesForCalculate = []
+let BSPassengersDirections = {}
+
+// Инициализация карты
+var map = L.map('map', { attributionControl: false }).setView([51.7727, 55.0988], 4);
+L.control.attribution({ prefix: 'Маршрутно-транспортные сети | {% if user.is_superuser %}<a href="{% url "admin:index" %}">Админ панель</a>{% else %}<a href="{% url "accounts:logout" %}">Выйти</a>{% endif %}' }).addTo(map);
+
+// Карты
+var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var lyrEsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+// Поверхности объектов
+let BusStops = L.layerGroup().addTo(map);
+let CitysLayer = L.markerClusterGroup().addTo(map);
+let RouteLayer = L.layerGroup().addTo(map);
+
+// Обработчик изменения масштаба карты
+map.on('zoomend', function() {
+    var currentZoom = map.getZoom();
+    // Управление видимостью маркеров в зависимости от уровня зума
+    if (currentZoom < 15 && BusStops.getLayers().length >= 1000) {
+        map.removeLayer(BusStops);
+        return
+    }
+    if (currentZoom < 11) {
+        map.removeLayer(BusStops);
+    } else {
+        map.addLayer(BusStops);
+    }
+});
+
+// Настройки карты в правом окошке
+let Maps = {
+    "OpenStreetMap": lyrOSM,
+    "ESRI World Imagery": lyrEsriImagery
+};
+let hide_view_groups = {
+    "Города": CitysLayer,
+    "Остановки": BusStops,
+    "Маршруты": RouteLayer,
+}
+L.control.layers(Maps, hide_view_groups, { collapsed: false }).addTo(map);
+
+// Разбор данных городов
+let citys = JSON.parse(document.getElementById('citys_json').textContent)
+citys.forEach(city => {
+    var CityIcon = L.icon({
+        iconUrl: '{% static 'city_icon.png' %}',
+        iconSize: [26, 26], // Размеры иконки
+        iconAnchor: [13, 30], // Точка, которая соответствует "ноге" маркера
+        popupAnchor: [1, -25] // Точка относительно иконки, где будет отображаться всплывающее окно
+    });
+    let city_style = {
+        icon: CityIcon,
+        alt: city.name,
+    };
+    CitysLayer.addLayer(L.marker([city.latitude, city.longitude], city_style)
+        .bindPopup(`<a href="#" onclick="ChoiceCity(${city.id})">${city.name}</a>`).on('dblclick', (event) => {
+            ChoiceCity(city.id)
+        }));
+});
+
+// Цвета для маршрутов
+ListColor = [
+    "#800080", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#9400D3"
+]
+
+function arrayRandElement(arr) {
+    var rand = Math.floor(Math.random() * arr.length);
+    return arr[rand];
+}
+</script>

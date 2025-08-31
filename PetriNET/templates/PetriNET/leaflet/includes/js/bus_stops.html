@@ -1,0 +1,224 @@
+{% load static %}
+<script>
+// Функции для работы с остановками
+
+var canvasRenderer = L.canvas();
+
+// Обработчик клика на остановку
+function ClickOnBS(BS) {
+    latlng = [BS.latlng.lat, BS.latlng.lng]
+    if (ActionOnClick == 'AddTempRoute') {
+        BS.target.closePopup();
+        let include = -1
+        TempRouteList.forEach((value, i) => {
+            if (value[0] == latlng[0] && value[1] == latlng[1]) {
+                include = i
+            }
+        })
+        if (include >= 0) {
+            TempRouteList.splice(include, 1);
+        }
+        else {
+            TempRouteList.push(latlng)
+        }
+        if (TempRouteList.length <= 1) {
+            $("#RouteAdd").removeClass('btn-success btn-primary').addClass('btn-danger');
+            $("#RouteAdd").text('x');
+            if (TempRoute) {
+                TempRoute.remove()
+                TempRoute = null;
+            }
+        }
+        if (TempRoute && TempRouteList.length <= 1) {
+            TempRoute.remove()
+            TempRoute = null;
+        }
+        if (TempRoute && TempRouteList.length > 1) {
+            TempRoute.setLatLngs(TempRouteList);
+        }
+        if (TempRouteList.length > 1 && (typeof TempRoute == "undefined" || TempRoute == null)) {
+            TempRoute = L.polyline(TempRouteList, {
+                // color: arrayRandElement(ListColor),
+                weight: 6,
+                fillOpacity: 0.2,
+            }).addTo(map);
+        }
+        if (TempRouteList.length > 1) {
+            $("#RouteAdd").removeClass('btn-danger btn-primary').addClass('btn-success');
+            $("#RouteAdd").text('✓');
+        }
+    }
+    else {
+        SetDataToBSPopup()
+    }
+}
+
+// Добавление остановки в группу остановок на карту
+function AddBS(latlng, id, name) {
+    var busStopIcon = L.icon({
+        iconUrl: '{% static 'bus_icon.png' %}',
+        iconSize: [14, 14], // Размеры иконки
+        iconAnchor: [7, 7], // Точка, которая соответствует "ноге" маркера
+        popupAnchor: [1, -20], // Точка относительно иконки, где будет отображаться всплывающее окно
+        renderer: canvasRenderer
+    });
+    let popup = `<a href="{% url 'admin:index' %}PetriNET/busstop/${id}/change/"><p>${name} ID: ${id}</p></a>`
+    popup += `
+        <div class="BusStopPassengers">
+            <input id="BSID" type="text" value="${id}" hidden>
+            <div id="DirectionsSheet">
+                <div class="input-group d-flex flex-nowrap mb-1">
+                    <div class="input-group-prepend">
+                    <div class="input-group-text" id="btnGroupAddon">${EI}</div>
+                    </div>
+                    <input type="number" id="PWD" class="form-control" style="width: 220px;" placeholder="В случайное направление" aria-label="В случайное направление" aria-describedby="btnGroupAddon" min="0">
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block mt-3" title="Добавить направление" onclick="AddDirection(this, ${id})">+</button>
+        </div>
+        `
+    BusStops.addLayer(L.marker(latlng, { icon: busStopIcon, alt: "Остановка" }).bindPopup(popup).on('click', ClickOnBS))
+}
+
+// Функции работы с заполнением кол-ва пассажиров
+function GetPopudBS(id) {
+    BSPopup = null
+    $(".BusStopPassengers").each(function() {
+        var popupContent = $(this)
+        var BSIDValue = popupContent.find("#BSID").val();
+        if (id && BSIDValue && BSIDValue == id) {
+            BSPopup = this
+        }
+        else if (!id) {
+            BSPopup = this
+        }
+    });
+    return BSPopup
+}
+
+function AddDirection(button, id) {
+    let parentDiv = $(button).closest('.BusStopPassengers');
+    let DirectionsSheetDiv = $(parentDiv).find('#DirectionsSheet')
+    let LastDiv = DirectionsSheetDiv.find('.input-group').last().attr("id")
+    if (!LastDiv) {
+        LastDiv = 1
+    }
+    else {
+        LastDiv = parseInt(LastDiv) + 1
+    }
+    DirectionsSheetDiv.append(
+    `                    
+    <div class="input-group mb-1" id="${LastDiv}">
+        <input type="number" id="BusStopID${LastDiv}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
+        <input type="number" id="PassengersCount${LastDiv}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
+    </div>
+    `
+    )
+    let BSIDValue = $(parentDiv).find('#BSID').val();
+}
+
+// Обработчик изменения полей пассажиров
+$(document).on('change', '.leaflet-popup-content input[type=number]', function() {
+    let parentDiv = $(this).closest('.BusStopPassengers');
+    let BSID = $(parentDiv).find('#BSID').val();
+    let key = $(this).attr('id');
+    let data = $(this).val();
+    data = data.replace(/[+-]/g, '')
+    if (!BSPassengersDirections[BSID]) {
+        BSPassengersDirections[BSID] = {
+            "Directions": {},
+        }
+    }
+    if (key.includes("BusStopID") || key.includes("PassengersCount")) {
+        if (key.includes("BusStopID")) {
+            base_str = "BusStopID"
+        } else {
+            base_str = "PassengersCount"
+        }
+        DirectionID = key.slice(base_str.length)
+        if (!BSPassengersDirections[BSID]["Directions"][DirectionID]) {
+            BSPassengersDirections[BSID]["Directions"][DirectionID] = {}
+        }
+        BSPassengersDirections[BSID]["Directions"][DirectionID][key] = data
+    }
+    else {
+        BSPassengersDirections[BSID][key] = data
+    }
+});
+
+function SetDataToBSPopup() {
+    BSPopup = GetPopudBS()
+    let DirectionsSheetDiv = $(BSPopup).find('#DirectionsSheet')
+    let BSID = $(BSPopup).find('#BSID').val();
+    $('.leaflet-popup-content input[type=number]').each(function() {
+        var key = $(this).attr('id');
+        if (BSPassengersDirections[BSID] && BSPassengersDirections[BSID][key]) {
+            $(this).val(BSPassengersDirections[BSID][key]);
+        }
+    });
+    if (BSPassengersDirections[BSID] && BSPassengersDirections[BSID]["Directions"]) {
+        for (const [key, value] of Object.entries(BSPassengersDirections[BSID]["Directions"])) {
+            var AppendDiv = `                    
+            <div class="input-group mb-1" id="${key}">
+                <input type="number" id="BusStopID${key}" class="form-control" placeholder="ID Остановки" aria-label="ID Остановки" min="0">
+                <input type="number" id="PassengersCount${key}" class="form-control" placeholder="Кол-во людей" aria-label="Кол-во людей" min="0">
+            </div>
+            `
+            DirectionsSheetDiv.append(AppendDiv)
+            for (const [InputID, InputValue] of Object.entries(value)) {
+                DirectionsSheetDiv.find(`#${InputID}`).val(InputValue)
+            }
+        }
+    }
+}
+
+// Функции для показа остановок в симуляции
+let ShowBSMarker
+
+function ShowBS(id) {
+    function Change_marker(bus_stop) {
+        if (ShowBSMarker) {
+            ShowBSMarker.remove()
+            ShowBSMarker = null
+        }
+        let style = {
+        radius: 15,
+        fillOpacity: 0.5,
+        color: 'blue',
+        };
+        ShowBSMarker = L.circleMarker([bus_stop.lat, bus_stop.lng], style).addTo(map).on('click', HiddenShowBS)
+    }
+    bus_stop = bus_stop_markers.find(bus_stop => bus_stop.id == id)
+    if (bus_stop) {
+        Change_marker(bus_stop)
+    }
+    else {
+        const csrftoken = getCookie('csrftoken');
+        $.ajax({
+            url: '{% url "PetriNET:get_bs" %}',
+            method: 'get',
+            dataType: 'html',
+            headers: { 'X-CSRFToken': csrftoken },
+            data: {
+                "id": id,
+            },
+            success: function (response) {
+                response_json = JSON.parse(response)
+                bus_stop = response_json.BusStop
+                bus_stop_markers.push(bus_stop)
+                Change_marker(bus_stop)
+            },
+            error: function (jqXHR, exception) {
+                console.log(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+            }
+        });
+    }
+}
+
+function HiddenShowBS() {
+    if (ShowBSMarker) {
+        ShowBSMarker.remove()
+        ShowBSMarker = null
+    }
+}
+</script>

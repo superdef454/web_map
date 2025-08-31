@@ -1,0 +1,57 @@
+<!-- Див нижней панели имитации работы онлайн -->
+<div id="bottom-panel" class="container d-none justify-content-center align-items-center">
+    <!-- d-flex -->
+    <div id="bottom-function-panel" class="row shadow-sm">
+        <div class="card border-primary w-100 mb-4">
+            <div class="card-header bg-light">
+                Имитация работы транспортной сети
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="end_simulation()">
+                    <span aria-hidden="true">×</span>
+                </button>    
+            </div>
+            <div class="card-body text-center">
+                <div class="row">            
+                    <div class="col">
+                        <input type="range" class="form-range w-100" id="StepsImitation" min="1" step="1">
+                    </div>
+                </div>
+                <div class="row">            
+                    <div class="col small mb-2" style="text-align: left;">
+                        Шаг
+                    </div>
+                    <div class="col small mb-2" id="StepNow">
+                        50
+                    </div>
+                    <div class="col small mb-2" id="LenStep" style="text-align: right;">
+                        100
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col" style="text-align: left;">
+                        <div class="btn-group" role="group">
+                            <!-- Ускорить -->
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(0)"><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(10)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <button type="button" class="btn btn-primary" onclick="setSingleStep(50)"><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i><i class="fas fa-angle-right"></i></button>
+                            <div class="input-group-text" id="SingleStepTitle">1</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="btn-group" role="group">
+                            <!-- Сброс -->
+                            <button type="button" class="btn btn-primary" onclick="stopTimer(), setRangeValue(1)"><i class="fas fa-redo"></i></button>
+                            <!-- Запуск -->
+                            <button type="button" class="btn btn-success" onclick="playTimer()"><i class="fas fa-play"></i></button>
+                            <!-- Пауза -->
+                            <button type="button" class="btn btn-danger" onclick="stopTimer()"><i class="fas fa-pause"></i></button>
+                        </div>
+                    </div>
+                    <div class="col" style="text-align: right;">
+                        <!-- Скачать отчёт -->
+                        <button class="btn btn-primary" type="button" onclick="DownloadReport()">Скачать отчёт <i class="fa-solid fa-download"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

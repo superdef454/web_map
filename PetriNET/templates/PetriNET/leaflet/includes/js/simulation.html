@@ -1,0 +1,179 @@
+<script>
+// Функции симуляции - основные переменные и функции управления
+
+// Данные для имитации работы онлайн
+let simulation_data
+let bus_markers = [] // Список автобусов
+let bus_stop_markers = [] // Список остановок
+let animation_list = [] // Список запущенных анимаций
+
+// Глобальные переменные для имитации работы
+let step_speed = 800
+let timer = null
+
+function stop_all_animation() {
+    animation_list.forEach(animation => {
+        animation.stop()
+    })
+    animation_list = []
+    bus_markers.forEach(bus => {
+        bus.marker.setLatLng([bus.lat, bus.lng])
+    })
+}
+
+function clear_bus_markers() {
+    bus_markers.forEach(bus => {
+        bus.marker.remove()
+    })
+    bus_markers = []
+}
+
+function clear_bus_stop_markers() {
+    bus_stop_markers.forEach(bus_stop => {
+        if (bus_stop.marker) {
+            bus_stop.marker.remove()
+        }
+    })
+    bus_stop_markers = []
+}
+
+function clear_data_for_simulation() {
+    // Остановить таймер
+    stopTimer()
+    stop_all_animation()
+    clear_bus_markers()
+    clear_bus_stop_markers()
+}
+
+// Функция разбора результатов расчёта
+function analysis_of_calculation_result(data_from_server) {
+    if (data_from_server.error == 0) {
+        simulation_data = data_from_server
+        let modal = $("#AnalysisOfCalculationResults");
+        modal.modal('show')
+    }
+    else {
+        alert("Ошибка расчёта\nОтвет сервера: " + data_from_server.error + ' ' + data_from_server.error_message)
+    }
+}
+
+// Имитировать работу онлайн
+function simulation() {
+    if (!simulation_data) {
+        return
+    }
+    DrawRoutsForCalculate()
+    // Скрыть левую панель
+    $("#left-panel").removeClass("d-flex");
+    $("#left-panel").addClass("d-none");
+    // Показать нижнюю
+    $("#bottom-panel").removeClass("d-none");
+    // Очистить карту от старых ОП
+    BusStops.clearLayers();
+    // Указать у StepsImitation количество step и max
+    let maxSteps = simulation_data.calculate.length; // Установите здесь желаемое количество шагов
+    $("#StepsImitation").attr("max", maxSteps);
+    $("#LenStep").text(maxSteps);
+    setRangeValue(1)
+    setSingleStep(0)
+}
+
+// Закончить имитацию
+function end_simulation() {
+    // Очищаем данные симуляции
+    clear_data_for_simulation()
+    delete simulation_data
+    // Скрыть нижнюю панель
+    $("#bottom-panel").addClass("d-none");
+    // Показать левую
+    $("#left-panel").removeClass("d-none");
+    $("#left-panel").addClass("d-flex");
+    // Вернуть данные на карту
+    UpdateCityData()
+    DrawRoutsForCalculate()
+}
+
+// Функция для автоматического установления значения в input type="range" и обновления данных симуляции
+function setRangeValue(step) {
+    stop_all_animation()
+    setStepAction(step);
+    $("#StepsImitation").val(step);
+    $("#StepNow").text(step + ' - ' + formatTime(simulation_data.calculate[step - 1][0]));
+}
+
+// Увеличить шаг на single_step
+function incrRangeValue() {
+    step = parseInt($("#StepsImitation").val(), 10);
+    maxSteps = parseInt($("#StepsImitation").attr("max"), 10)
+    if (step >= maxSteps) {
+        stopTimer()
+        stop_all_animation()
+        return
+    }
+    step += 1
+    setRangeValue(step)
+}
+
+// Функция работы с step_speed
+function setSingleStep(step_diff) {
+    if (step_diff == 0) {
+        step_speed = 800
+    }
+    else {
+        step_speed -= step_diff
+        step_speed = Math.abs(step_speed);
+    }
+    $("#SingleStepTitle").text(step_speed + "мс.");
+}
+
+$("#StepsImitation").on("input", function() {
+    setRangeValue($(this).val())
+});
+
+function Step() {
+    incrRangeValue()
+}
+
+function playTimer() {
+    if (timer != null) {
+        clearInterval(timer);
+    }
+    timer = setInterval(Step, step_speed)
+}
+
+function stopTimer() {
+    if (timer != null) {
+        clearInterval(timer);
+    }
+}
+
+function DownloadReport() {
+    if (!simulation_data) {
+        alert('Отсутствуют данные для отчёта!')
+        return
+    }
+    const csrftoken = getCookie('csrftoken');
+    $.ajax({
+        url: '{% url "PetriNET:download_report_file" %}',
+        method: 'post',
+        dataType: 'html',
+        headers: { 'X-CSRFToken': csrftoken },
+        data: {
+            "data_to_report": JSON.stringify(simulation_data.data_to_report),
+        },
+        success: function (response) {
+            // Создаём временную ссылку для скачивания файла
+            const link = document.createElement('a');
+            const currentUrl = window.location.href;
+            link.href = currentUrl + JSON.parse(response).file_path;
+            link.setAttribute('download', ''); // Необходимо для некоторых браузеров
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        },
+        error: function (jqXHR, exception) {
+            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+        }
+    });
+}
+</script>
