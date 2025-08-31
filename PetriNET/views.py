@@ -10,7 +10,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from PetriNET.petri_net_utils import CreateResponseFile, GetDataToCalculate, PetriNet
 from PetriNET.utils import auth_required
 
-from .models import City, TC, BusStop, Route, EI
+from .models import City, TC, BusStop, Route, EI, District
 from django.db.models import Count, Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -34,7 +34,9 @@ from .serializers import (
     RouteSerializer,
     RouteDetailSerializer,
     RouteCreateUpdateSerializer,
-    EISerializer
+    EISerializer,
+    DistrictSerializer,
+    DistrictGeoSerializer
 )
 
 
@@ -532,50 +534,6 @@ class RouteViewSet(viewsets.ModelViewSet):
         serializer = BusStopSerializer(busstops, many=True)
         return Response(serializer.data)
 
-    @extend_schema(
-        summary="Получить маршруты по городу",
-        description="Возвращает все маршруты для указанного города",
-        parameters=[
-            OpenApiParameter(
-                name='city_id',
-                description='ID города',
-                required=True,
-                type=OpenApiTypes.INT
-            ),
-        ],
-        tags=['Маршруты']
-    )
-    @action(detail=False, methods=['get'])
-    def by_city(self, request):
-        """Получить маршруты по городу"""
-        city_id = request.query_params.get('city_id')
-        if not city_id:
-            return Response(
-                {'error': 'Параметр city_id обязателен'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            city_id = int(city_id)
-        except ValueError:
-            return Response(
-                {'error': 'Параметр city_id должен быть числом'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        routes = self.get_queryset().filter(city_id=city_id)
-        
-        # Применяем фильтры и пагинацию
-        routes = self.filter_queryset(routes)
-        page = self.paginate_queryset(routes)
-        
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        
-        serializer = self.get_serializer(routes, many=True)
-        return Response(serializer.data)
-
 
 @extend_schema_view(
     list=extend_schema(
@@ -636,3 +594,84 @@ class EIViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     
     pagination_class = ValidatedPageNumberPagination
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список районов",
+        description="Возвращает список всех районов с возможностью фильтрации и поиска",
+        tags=['Районы']
+    ),
+    retrieve=extend_schema(
+        summary="Получить информацию о районе",
+        description="Возвращает подробную информацию о конкретном районе",
+        tags=['Районы']
+    ),
+    create=extend_schema(
+        summary="Создать новый район",
+        description="Создает новый район в системе",
+        tags=['Районы']
+    ),
+    update=extend_schema(
+        summary="Обновить информацию о районе",
+        description="Полностью обновляет информацию о районе",
+        tags=['Районы']
+    ),
+    partial_update=extend_schema(
+        summary="Частично обновить информацию о районе",
+        description="Частично обновляет информацию о районе",
+        tags=['Районы']
+    ),
+    destroy=extend_schema(
+        summary="Удалить район",
+        description="Удаляет район из системы",
+        tags=['Районы']
+    )
+)
+class DistrictViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для работы с районами города.
+    
+    Предоставляет CRUD операции для модели District.
+    Поддерживает фильтрацию по городу, поиск по названию и геопространственные запросы.
+    """
+    queryset = District.objects.select_related('city').order_by('city__name', 'name')
+    serializer_class = DistrictSerializer
+    permission_classes = [IsAuthenticated]
+    
+    filter_backends = [
+        ValidatedDjangoFilterBackend,
+        ValidatedSearchFilter,
+        ValidatedOrderingFilter,
+    ]
+    
+    filterset_fields = {
+        'city': ['exact'],
+        'city__name': ['exact', 'icontains'],
+        'name': ['exact', 'icontains'],
+    }
+    
+    search_fields = ['name', 'city__name', 'description']
+    ordering_fields = ['name', 'city__name', 'id']
+    ordering = ['city__name', 'name']
+    
+    pagination_class = ValidatedPageNumberPagination
+    
+    def get_serializer_class(self):
+        """Выбор сериализатора в зависимости от действия"""
+        if self.action == 'geo_list':
+            return DistrictGeoSerializer
+        return self.serializer_class
+    
+    @extend_schema(
+        summary="Получить районы в формате GeoJSON",
+        description="Возвращает районы в формате GeoJSON для отображения на карте",
+        responses={200: DistrictGeoSerializer(many=True)},
+        tags=['Районы']
+    )
+    @action(detail=False, methods=['get'], url_path='geo')
+    def geo_list(self, request):
+        """Возвращает районы в формате GeoJSON"""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = DistrictGeoSerializer(queryset, many=True)
+        return Response(serializer.data)

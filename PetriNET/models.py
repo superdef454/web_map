@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.db import models
 from django.forms import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.gis.db import models as gis_models
 
 
 def validate_latitude(value):
@@ -26,6 +27,27 @@ class City(models.Model):
     class Meta:
         verbose_name = 'Город'
         verbose_name_plural = 'Города'
+
+
+class District(gis_models.Model):
+    """Модель для хранения районов города с полигонами"""
+    city = models.ForeignKey(
+        City, 
+        verbose_name="Город", 
+        on_delete=models.CASCADE, 
+        related_name='districts'
+    )
+    name = models.CharField(verbose_name="Название района", max_length=250)
+    polygon = gis_models.PolygonField(verbose_name="Полигон района", srid=4326)
+    description = models.TextField(verbose_name="Описание", null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.city.name})"
+
+    class Meta:
+        verbose_name = 'Район'
+        verbose_name_plural = 'Районы'
+        unique_together = ('city', 'name')
 
 
 class TC(models.Model):

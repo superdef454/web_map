@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.contrib.gis.admin import GISModelAdmin
 from django.core.management import call_command
-from .models import City, BusStop, Route, TC
+from .models import City, BusStop, Route, TC, District
 
 
 @admin.register(Route)
@@ -28,12 +29,49 @@ class ClassTCAdmin(admin.ModelAdmin):
     search_fields = ('name',)
 
 
+@admin.register(District)
+class DistrictAdmin(GISModelAdmin):
+    """Админ-панель для районов с геополем"""
+    list_display = ('name', 'city')
+    list_filter = ('city',)
+    search_fields = ('name', 'city__name')
+    ordering = ('city__name', 'name')
+    
+    # Настройки для карты
+    default_zoom = 12
+    map_width = 800
+    map_height = 600
+    
+    fieldsets = (
+        ('Основная информация', {
+            'fields': ('city', 'name', 'description')
+        }),
+        ('Географические данные', {
+            'fields': ('polygon',)
+        }),
+    )
+
+
+class DistrictInline(admin.TabularInline):
+    """Инлайн для отображения районов на странице города"""
+    model = District
+    extra = 0
+    fields = ('name', 'description')
+    readonly_fields = ()
+
+
 @admin.register(City)
 class ClassCityAdmin(admin.ModelAdmin):
     search_fields = ('name',)
-    list_display = ('name',)
+    list_display = ('name', 'districts_count')
     actions = ['update_bus_stops']
     ordering = ('name',)
+    inlines = [DistrictInline]
+
+    def districts_count(self, obj):
+        """Подсчет количества районов в городе"""
+        return obj.districts.count()
+    districts_count.short_description = 'Количество районов'
 
     def update_bus_stops(self, request, queryset):
         for city in queryset:

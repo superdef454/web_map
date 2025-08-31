@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from drf_spectacular.utils import extend_schema_field
-from .models import City, TC, BusStop, Route, EI
+from .models import City, TC, BusStop, Route, EI, District
 
 
 class CitySerializer(serializers.ModelSerializer):
@@ -192,3 +192,27 @@ class EISerializer(serializers.ModelSerializer):
     class Meta:
         model = EI
         fields = ['id', 'name', 'short_name']
+
+
+class DistrictSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели District"""
+    city_name = serializers.CharField(source='city.name', read_only=True)
+    
+    class Meta:
+        model = District
+        fields = [
+            'id', 'name', 'city', 'city_name', 
+            'polygon', 'description'
+        ]
+
+
+class DistrictGeoSerializer(GeoFeatureModelSerializer):
+    """Геосериализатор для модели District для работы с картами"""
+    city_name = serializers.CharField(source='city.name', read_only=True)
+    
+    class Meta:
+        model = District
+        geo_field = 'polygon'
+        fields = [
+            'id', 'name', 'city', 'city_name', 'description'
+        ]
