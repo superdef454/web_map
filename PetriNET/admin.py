@@ -76,7 +76,7 @@ class DistrictInline(GISStackedInline):
 class ClassCityAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     list_display = ('name', 'districts_count')
-    actions = ['update_bus_stops']
+    actions = ['update_bus_stops', 'update_routes']
     ordering = ('name',)
     inlines = [DistrictInline]
 
@@ -90,5 +90,11 @@ class ClassCityAdmin(admin.ModelAdmin):
             call_command('load_stations', city_id=city.id)
         self.message_user(request, "Остановочные пункты успешно добавлены.")
     update_bus_stops.short_description = "Добавление данных остановочных пунктов"
+
+    def update_routes(self, request, queryset):
+        for city in queryset:
+            call_command('get_city_routes', city_id=city.id)
+        self.message_user(request, "Маршруты успешно обновлены.")
+    update_routes.short_description = "Обновление данных маршрутов"
 
 # admin.site.register(EI)

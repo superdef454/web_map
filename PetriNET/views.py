@@ -87,9 +87,9 @@ class CityView(View):
         Routes = Route.objects.filter(city_id=city_id).prefetch_related('busstop')
         RouteList = []
         for route in Routes:
-            if len(route.list_coord) != route.busstop.all().count():
-                route.delete()
-                continue
+            # if len(route.list_coord) != route.busstop.all().count():
+            #     route.delete()
+            #     continue
             RouteList.append(
                 {
                     'name': route.name,

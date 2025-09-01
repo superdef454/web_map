@@ -51,7 +51,7 @@ class District(gis_models.Model):
 
 
 class TC(models.Model):
-    name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250)
+    name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250, unique=True)
     # TODO Добавить поле изображения для визализации что это за транспорт
     capacity = models.SmallIntegerField(verbose_name="Вместимость")
     description = models.TextField(verbose_name="Описание", null=True, blank=True)

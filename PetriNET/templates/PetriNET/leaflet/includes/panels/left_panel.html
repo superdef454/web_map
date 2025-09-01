@@ -1,16 +1,21 @@
 {% load static %}
 <div id="left-panel" class="container d-flex align-items-center">
     <div id="left-function-panel" class="row shadow-sm">
-        <div class="dropdown mb-3">
-            <select class="selectpicker" title="Выберите город" data-style="btn-primary" data-live-search="true" id="dropdownMenuButton" onchange="ChangeCityOnSelect(this)">
-                {% if citys %}
-                {% for city in citys %}
-                <option value="{{city.id}}">{{city.name}}</option>
-                {% endfor %}
-                {% else %}
-                <option value="0">Добавить</option>
-                {% endif %}
-            </select>
+        <div class="mb-3 d-flex">
+            <div class="dropdown flex-grow-1">
+                <select class="selectpicker" title="Выберите город" data-style="btn-primary" data-live-search="true" id="dropdownMenuButton" onchange="ChangeCityOnSelect(this)">
+                    {% if citys %}
+                    {% for city in citys %}
+                    <option value="{{city.id}}">{{city.name}}</option>
+                    {% endfor %}
+                    {% else %}
+                    <option value="0">Добавить</option>
+                    {% endif %}
+                </select>
+            </div>
+            <button class="btn btn-primary ml-2" type="button" onclick="UpdateCityData()" title="Обновить данные города">
+                <i class="fas fa-sync-alt"></i>
+            </button>
         </div>
         <div class="card bg-transparent border-primary w-100 mb-3">
             <div class="card-header bg-light">
