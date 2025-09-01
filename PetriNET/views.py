@@ -184,49 +184,6 @@ class RouteView(View):
             }})
 
 
-class Calculate(View):
-    """Класс расчёта нагрузки"""
-
-    @method_decorator(auth_required())
-    def post(self, request):
-        response = {'error': 0}
-        try:
-            request_data_to_calculate = json.loads(request.POST.get('DataToCalculate'))
-            logger.info(f"Данные для разбора: {request_data_to_calculate}")
-            DataToCalculate = GetDataToCalculate(request_data_to_calculate)
-        except Exception:
-            logger.exception("Ошибка получения данных для рассчёта")
-            response.update(
-                {
-                    'error': 1,
-                    'error_message': 'Ошибка заполнения данных'
-                }
-            )
-            return JsonResponse(response)
-        else:
-            logger.info(f"Данные для расчёта: {DataToCalculate}")
-
-        try:
-            petri_net = PetriNet(DataToCalculate)
-            calculate = petri_net.Calculation()
-            data_to_report = petri_net.CreateDataToReport()
-        except Exception:
-            logger.exception("Ошибка расчёта нагрузки")
-            response.update(
-                {
-                    'error': 2,
-                    'error_message': 'Ошибка расчёта нагрузки'
-                }
-            )
-            return JsonResponse(response)
-
-        response.update({
-            'calculate': calculate,
-            'data_to_report': data_to_report,
-        })
-
-        return JsonResponse(response)
-
 
 def download_report_file(request):
     data_to_report = json.loads(request.POST.get('data_to_report'))
@@ -739,9 +696,10 @@ class CalculationViewSet(viewsets.GenericViewSet):
         response = {'error': 0}
         
         try:
-            data_to_calculate_raw = serializer.validated_data['DataToCalculate']
-            logger.info(f"Данные для разбора: {data_to_calculate_raw}")
-            data_to_calculate = GetDataToCalculate(data_to_calculate_raw)
+            # Используем новый метод для получения обработанных данных
+            processed_data = serializer.validated_data['data_to_calculate']
+            logger.info(f"Данные для разбора: {processed_data}")
+            data_to_calculate = GetDataToCalculate(processed_data)
         except Exception as e:
             logger.exception("Ошибка получения данных для расчёта")
             return Response({

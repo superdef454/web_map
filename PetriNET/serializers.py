@@ -218,30 +218,73 @@ class DistrictGeoSerializer(GeoFeatureModelSerializer):
         ]
 
 
+class RouteCalculationDataSerializer(serializers.Serializer):
+    """Сериализатор для данных маршрута в расчете"""
+    id = serializers.IntegerField(help_text="ID маршрута")
+    name = serializers.CharField(max_length=255, help_text="Название маршрута")
+
+
+class BusStopDirectionSerializer(serializers.Serializer):
+    """Сериализатор для направления пассажиров с остановки"""
+    busstop_id = serializers.IntegerField(help_text="ID остановки назначения")
+    passengers_count = serializers.IntegerField(
+        min_value=0, 
+        help_text="Количество пассажиров, направляющихся к данной остановке"
+    )
+
+
+class BusStopCalculationDataSerializer(serializers.Serializer):
+    """Сериализатор для данных остановки в расчете"""
+    busstop_id = serializers.IntegerField(help_text="ID остановки")
+    passengers_without_direction = serializers.IntegerField(
+        default=0,
+        min_value=0,
+        help_text="Количество пассажиров без определенного направления"
+    )
+    directions = BusStopDirectionSerializer(
+        many=True,
+        required=False,
+        help_text="Направления пассажиров с данной остановки"
+    )
+
+
+class CalculationDataSerializer(serializers.Serializer):
+    """Сериализатор для основных данных расчета"""
+    city_id = serializers.IntegerField(help_text="ID города")
+    routes = RouteCalculationDataSerializer(
+        many=True,
+        help_text="Список маршрутов для расчета"
+    )
+    busstops = serializers.DictField(
+        child=BusStopCalculationDataSerializer(),
+        help_text="Данные остановок, где ключ - ID остановки"
+    )
+    
+    def validate_routes(self, value):
+        """Валидация маршрутов"""
+        if not value:
+            error_msg = "Список маршрутов не может быть пустым"
+            raise serializers.ValidationError(error_msg)
+        return value
+    
+    def validate_city_id(self, value):
+        """Валидация ID города"""
+        if not City.objects.filter(id=value).exists():
+            error_msg = f"Город с ID {value} не найден"
+            raise serializers.ValidationError(error_msg)
+        return value
+
+
 class CalculationRequestSerializer(serializers.Serializer):
     """Сериализатор для запроса расчета нагрузки транспортной сети"""
     
-    DataToCalculate = serializers.JSONField(
-        help_text="Данные для расчета нагрузки в формате JSON. "
-                  "Должны содержать информацию о маршрутах, остановках, "
-                  "параметрах транспортных средств и временных интервалах."
+    data_to_calculate = CalculationDataSerializer(
+        help_text="Данные для расчета нагрузки"
     )
-    
-    def validate_data_to_calculate(self, value):
-        """Валидация данных для расчета"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError(
-                "DataToCalculate должно быть JSON-объектом"
-            )
-        
-        # Проверяем наличие обязательных полей
-        required_fields = ['routes', 'transport_params']
-        for field in required_fields:
-            if field not in value:
-                error_msg = f"Отсутствует обязательное поле: {field}"
-                raise serializers.ValidationError(error_msg)
-        
-        return value
+    get_timeline = serializers.BooleanField(
+        default=True,
+        help_text="Флаг для возвращения временной шкалы с имитацией работы транспортной сети"
+    )
 
 
 class CalculationResultDataSerializer(serializers.Serializer):

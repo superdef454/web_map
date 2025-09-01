@@ -117,17 +117,58 @@ function Сalculation() {
         return
     }
     const csrftoken = getCookie('csrftoken');
-    $.ajax({
-        url: '{% url "PetriNET:load_calculation" %}',
-        method: 'post',
-        dataType: 'html',
-        headers: { 'X-CSRFToken': csrftoken },
-        data: {
-            "DataToCalculate": JSON.stringify(DataToCalculate),
+    
+    // Преобразуем данные остановок в новый формат
+    const transformedBusstops = {};
+    Object.keys(DataToCalculate.busstops).forEach(busstopId => {
+        const oldData = DataToCalculate.busstops[busstopId];
+        transformedBusstops[busstopId] = {
+            busstop_id: parseInt(busstopId),
+            passengers_without_direction: parseInt(oldData.PWD || 0),
+            directions: []
+        };
+        
+        // Преобразуем направления
+        if (oldData.Directions && typeof oldData.Directions === 'object') {
+            Object.values(oldData.Directions).forEach(direction => {
+                // Ищем все пары BusStopIDx и PassengersCountx
+                Object.keys(direction).forEach(key => {
+                    if (key.startsWith('BusStopID')) {
+                        // Извлекаем номер направления (например, "1" из "BusStopID1")
+                        const directionNumber = key.replace('BusStopID', '');
+                        const passengersKey = `PassengersCount${directionNumber}`;
+                        
+                        // Проверяем, что есть соответствующее поле PassengersCount
+                        if (direction[passengersKey]) {
+                            transformedBusstops[busstopId].directions.push({
+                                busstop_id: parseInt(direction[key]),
+                                passengers_count: parseInt(direction[passengersKey])
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    });
+    
+    // Преобразуем данные в новый формат
+    const newFormatData = {
+        data_to_calculate: {
+            city_id: DataToCalculate.city_id,
+            routes: DataToCalculate.routes,
+            busstops: transformedBusstops
         },
+        get_timeline: true
+    };
+    
+    $.ajax({
+        url: '/api/calculations/calculate/',
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'X-CSRFToken': csrftoken },
+        data: JSON.stringify(newFormatData),
         success: function (data) {
-            data_from_server = JSON.parse(data)
-            analysis_of_calculation_result(data_from_server)
+            analysis_of_calculation_result(data)
         },
         error: function (jqXHR, exception) {
             alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)

@@ -62,14 +62,14 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
                 route__id__in=busstop.get_routes_ids()).values_list('id', flat=True).distinct()  # Пока делаем без пересадок
             busstop_from_request = request_data_to_calculate['busstops'].pop(str(busstop.id), None)
             if busstop_from_request:
-                PassengersWithoutDirection = int(busstop_from_request.get('PWD', 0))
+                PassengersWithoutDirection = int(busstop_from_request.get('passengers_without_direction', 0))
                 if PassengersWithoutDirection:
                     BSAddItem['directions'].update({
                         0: PassengersWithoutDirection
                     })
-                for key, value in busstop_from_request['Directions'].items():
-                    BusStopID = int(value.get(f"BusStopID{key}", 0))
-                    PassengersCount = int(value.get(f"PassengersCount{key}", 0))
+                for direction in busstop_from_request['directions']:
+                    BusStopID = int(direction.get('busstop_id', 0))
+                    PassengersCount = int(direction.get('passengers_count', 0))
                     if BusStopID and PassengersCount and busstops.filter(id=BusStopID).exists() and \
                        BusStopID != busstop.id and BusStopID in valid_bus_stops:
                         BSAddItem['directions'].update({
@@ -447,7 +447,7 @@ class PetriNet():
         """Собирает данные для отчёта"""
         data_to_report = {}
         data_to_report['city_name'] = City.objects.get(id=self.data_to_calculate['city_id']).name
-        data_to_report['data'] = str(datetime.datetime.now().isoformat(sep='_', timespec='seconds'))
+        data_to_report['data'] = str(datetime.datetime.now().isoformat(sep='_', timespec='seconds')).replace(':', '-')
         data_to_report['bus_stops'] = []
         for bus_stop in self.data_to_calculate['busstops']:
             bus_add = {}
