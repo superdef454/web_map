@@ -14,7 +14,7 @@ function CreateRoute(list_coord, id, name) {
 function DrawRoute(route) {
     RouteLayer.addLayer(L.polyline(route.list_coord, {
         // color: arrayRandElement(ListColor),
-        weight: 6,
+        weight: 3,
         fillOpacity: 0.2,
     }).bindPopup(`<a href="{% url 'admin:index' %}PetriNET/route/${route.id}/change/"><p>${route.name}</p></a>`));
 }

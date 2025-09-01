@@ -6,6 +6,8 @@ from typing import Any
 import requests
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
+from shapely.geometry import LineString
+from shapely.ops import linemerge, unary_union
 
 from PetriNET.models import TC, BusStop, City, Route
 
@@ -104,6 +106,9 @@ class Command(BaseCommand):
                 route_ref = tags.get('ref', tags.get('name', f'Неизвестный маршрут {element["id"]}'))
                 route_name = tags.get('name', f'Маршрут {route_ref}')
                 
+                # Очищаем название от проблемных Unicode символов для логирования
+                clean_route_name = self._clean_unicode_for_logging(route_name)
+                
                 # Определяем тип транспорта
                 tc = transport_types.get(route_type)
                 if not tc:
@@ -128,7 +133,7 @@ class Command(BaseCommand):
                 
                 if created:
                     routes_created += 1
-                    logger.info(f"Создан маршрут: {route_name}")
+                    logger.debug(f"Создан маршрут: {clean_route_name}")
                 else:
                     # Обновляем существующий маршрут
                     route.tc = tc
@@ -136,7 +141,7 @@ class Command(BaseCommand):
                     route.list_coord = coordinates
                     route.save()
                     routes_updated += 1
-                    logger.info(f"Обновлен маршрут: {route_name}")
+                    logger.debug(f"Обновлен маршрут: {clean_route_name}")
                 
                 # Связываем остановки с маршрутом
                 # self._link_bus_stops_to_route(route, element, city)
@@ -184,18 +189,45 @@ class Command(BaseCommand):
         return transport_types
 
     def _extract_route_coordinates(self, element: dict[str, Any]) -> list[list[float]]:
-        """Извлекает координаты маршрута из геометрии"""
-        coordinates = []
-        
+        """Извлекает координаты маршрута и корректно упорядочивает"""
+        segments = []
+
         for member in element.get('members', []):
             if member.get('type') == 'way' and 'geometry' in member:
-                coordinates.extend([point['lat'], point['lon']] for point in member['geometry'])
-            elif member.get('type') == 'node':
-                coordinates.append([member['lat'], member['lon']])
+                coords = [(pt['lon'], pt['lat']) for pt in member['geometry']]
+                if len(coords) >= 2:  # только линии
+                    segments.append(LineString(coords))
+            # elif member.get('type') == 'node':
+            #     # одиночные точки пропускаем или сохраняем отдельно
+            #     lon = member.get('lon')
+            #     lat = member.get('lat')
+            #     if lon is not None and lat is not None:
+            #         # такие точки просто добавим потом в итоговый список
+            #         segments.append(LineString([(lon, lat), (lon, lat)]))  # дублируем точку
+
+        if not segments:
+            return []
+
+        try:
+            merged = linemerge(unary_union(segments))
+
+            if merged.geom_type == 'LineString':
+                coords = list(merged.coords)
+            elif merged.geom_type == 'MultiLineString':
+                # Выбираем LineString с наибольшим количеством точек
+                longest_line = max(merged.geoms, key=lambda line: len(line.coords))
+                coords = list(longest_line.coords)
             else:
-                self.style.WARNING(f"Неизвестный тип члена маршрута: {member.get('type')}")
-        
-        return coordinates
+                coords = []
+
+            return [[lat, lon] for lon, lat in coords]
+
+        except Exception as e:
+            self.style.WARNING(f"Ошибка при объединении сегментов маршрута {element.get('id')}: {e}")
+            raw_coords = []
+            for seg in segments:
+                raw_coords.extend([[lat, lon] for lon, lat in seg.coords])
+            return raw_coords
 
     def _parse_interval(self, interval_str: str) -> int:
         """Парсит интервал движения из строки"""
@@ -263,7 +295,39 @@ class Command(BaseCommand):
             # Связываем найденные остановки с маршрутом
             if linked_stops:
                 route.busstop.set(linked_stops)
-                logger.info(f"Связано {len(linked_stops)} остановок с маршрутом {route.name}")
+                clean_name = self._clean_unicode_for_logging(route.name)
+                logger.info(f"Связано {len(linked_stops)} остановок с маршрутом {clean_name}")
                 
         except (requests.RequestException, ValueError) as e:
-            logger.warning(f"Не удалось связать остановки с маршрутом {route.name}: {str(e)}")
+            clean_name = self._clean_unicode_for_logging(route.name)
+            logger.warning(f"Не удалось связать остановки с маршрутом {clean_name}: {str(e)}")
+
+    def _clean_unicode_for_logging(self, text: str) -> str:
+        """
+        Очищает текст от символов Unicode, которые не поддерживаются в cp1251
+        """
+        if not text:
+            return text
+        
+        # Заменяем проблемные Unicode символы на безопасные ASCII аналоги
+        replacements = {
+            '→': ' -> ',  # Стрелка вправо
+            '←': ' <- ',  # Стрелка влево
+            '↔': ' <-> ', # Стрелка в обе стороны
+            '—': ' - ',   # Длинное тире
+            '–': ' - ',   # Среднее тире
+            '"': '"',     # Кавычка  
+            '…': '...',   # Многоточие
+        }
+        
+        cleaned_text = text
+        for unicode_char, ascii_replacement in replacements.items():
+            cleaned_text = cleaned_text.replace(unicode_char, ascii_replacement)
+        
+        # Удаляем все остальные символы, которые не входят в cp1251
+        try:
+            cleaned_text.encode('cp1251')
+            return cleaned_text
+        except UnicodeEncodeError:
+            # Если все еще есть проблемы, кодируем с игнорированием ошибок
+            return cleaned_text.encode('cp1251', errors='ignore').decode('cp1251')
