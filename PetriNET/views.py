@@ -720,9 +720,11 @@ class CalculationViewSet(viewsets.GenericViewSet):
                 'error_message': 'Ошибка расчёта нагрузки',
                 'details': str(e)
             }, status=500)
+        
+        if serializer.validated_data.get('get_timeline'):
+            response['calculate'] = calculate_result
 
         response.update({
-            'calculate': calculate_result,
             'data_to_report': data_to_report,
         })
 
