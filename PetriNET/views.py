@@ -36,6 +36,7 @@ from .serializers import (
     RouteCreateUpdateSerializer,
     RouteDetailSerializer,
     RouteSerializer,
+    SimulationSerializer,
     TCSerializer,
 )
 
@@ -751,3 +752,51 @@ class CalculationViewSet(viewsets.GenericViewSet):
         else:
             # Если есть проблемы с сериализацией ответа, возвращаем как есть
             return Response(response)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Получить список симуляций",
+        description="Возвращает список всех сохранённых симуляций с краткой информацией",
+        parameters=[
+            OpenApiParameter(
+                name='ordering',
+                description='Поле для сортировки. Доступные поля: created_at, id',
+                required=False,
+                type=OpenApiTypes.STR,
+                default='-created_at'
+            ),
+        ]
+    ),
+    retrieve=extend_schema(
+        summary="Получить детальную информацию о симуляции",
+        description="Возвращает полную информацию о симуляции, включая входные данные и результаты расчёта"
+    )
+)
+class SimulationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet для работы с симуляциями (только чтение).
+    
+    Предоставляет операции получения списка и детальной информации для сохранённых симуляций транспортной сети.
+    Симуляции содержат входные данные расчёта и результаты обработки.
+    Создание, изменение и удаление симуляций недоступно через API.
+    """
+    
+    queryset = Simulation.objects.all()
+    serializer_class = SimulationSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [ValidatedDjangoFilterBackend, ValidatedSearchFilter, ValidatedOrderingFilter]
+    pagination_class = ValidatedPageNumberPagination
+    
+    # Поля для фильтрации
+    filterset_fields = {
+        'created_at': ['exact', 'gte', 'lte', 'range'],
+        'id': ['exact', 'in'],
+    }
+    
+    # Поля для поиска
+    search_fields = ['description']
+    
+    # Поля для сортировки
+    ordering_fields = ['created_at', 'id']
+    ordering = ['-created_at']  # Сортировка по умолчанию (новые сверху)

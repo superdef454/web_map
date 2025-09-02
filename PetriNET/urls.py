@@ -1,11 +1,21 @@
-from django.urls import path
-from .views import (
-    BusStopView, CalculationViewSet, CityView, MainMap, RouteView, download_report_file, 
-    CityViewSet, TCViewSet, BusStopViewSet, RouteViewSet, EIViewSet, DistrictViewSet
-)
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .views import (
+    BusStopView,
+    BusStopViewSet,
+    CalculationViewSet,
+    CityView,
+    CityViewSet,
+    DistrictViewSet,
+    EIViewSet,
+    MainMap,
+    RouteView,
+    RouteViewSet,
+    SimulationViewSet,
+    TCViewSet,
+    download_report_file,
+)
 
 app_name = 'PetriNET'
 
@@ -17,6 +27,7 @@ api_router.register(r'busstops', BusStopViewSet, basename='busstop')
 api_router.register(r'routes', RouteViewSet, basename='route')
 api_router.register(r'districts', DistrictViewSet, basename='district')
 api_router.register(r'calculations', CalculationViewSet, basename='calculation')
+api_router.register(r'simulations', SimulationViewSet, basename='simulation')
 # api_router.register(r'measurement-units', EIViewSet, basename='ei')
 
 

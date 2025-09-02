@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import random
+from decimal import Decimal
 
 from docx import Document
 from docx.shared import Pt
@@ -135,15 +136,43 @@ class PetriNet():
 
         def serialize_route_point(self, point: list):
             # Удобное хранение данных маршрута
+            tolerance = Decimal('0.0001')
+
             bus_stop_id = 0
+            lat, lon = point[0], point[1]
+            
+            # Сначала пробуем точное совпадение
             for bs in self.route.busstop.all():
-                if point[0] == float(bs.latitude) and point[1] == float(bs.longitude):
+                if lat == float(bs.latitude) and lon == float(bs.longitude):
                     bus_stop_id = bs.id
                     break
+            
+            # Если точное совпадение не найдено, ищем в радиусе tolerance
+            if bus_stop_id == 0:
+                nearby_stops = []
+                for bs in self.route.busstop.all():
+                    bs_lat = float(bs.latitude)
+                    bs_lon = float(bs.longitude)
+                    if (bs_lat >= lat - float(tolerance) and bs_lat <= lat + float(tolerance) and
+                        bs_lon >= lon - float(tolerance) and bs_lon <= lon + float(tolerance)):
+                        nearby_stops.append(bs)
+                
+                if nearby_stops:
+                    if len(nearby_stops) > 1:
+                        # Если найдено несколько остановок, выбираем ближайшую
+                        closest_stop = min(nearby_stops, key=lambda stop: 
+                                         get_travel_range(lat, lon, float(stop.latitude), float(stop.longitude)))
+                        bus_stop_id = closest_stop.id
+                    else:
+                        bus_stop_id = nearby_stops[0].id
+            
+            if bus_stop_id == 0:
+                raise Exception(f"Не удалось найти остановку для точки маршрута: {point}, {self.route.id}. Переформируйте маршрут.")
+
             return {
                 "bus_stop_id": bus_stop_id,
-                "latitude": point[0],
-                "longitude": point[1],
+                "latitude": lat,
+                "longitude": lon,
                 }
 
         def ending_station(self) -> bool:

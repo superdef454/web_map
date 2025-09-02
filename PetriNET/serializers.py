@@ -2,7 +2,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import EI, TC, BusStop, City, District, Route
+from .models import EI, TC, BusStop, City, District, Route, Simulation
 
 
 class CitySerializer(serializers.ModelSerializer):
@@ -336,3 +336,18 @@ class CalculationResponseSerializer(serializers.Serializer):
         required=False,
         help_text="ID симуляции в базе (если есть)"
     )
+
+
+class SimulationSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели Simulation"""
+    
+    class Meta:
+        model = Simulation
+        fields = [
+            'id', 
+            'created_at', 
+            'input_data', 
+            'report_data', 
+            'description',
+        ]
+        read_only_fields = ['id', 'created_at']
