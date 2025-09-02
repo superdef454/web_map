@@ -23,7 +23,7 @@ from TransportMap.utils import (
     ValidatedSearchFilter,
 )
 
-from .models import EI, TC, BusStop, City, District, Route
+from .models import EI, TC, BusStop, City, District, Route, Simulation
 from .serializers import (
     BusStopGeoSerializer,
     BusStopSerializer,
@@ -697,7 +697,7 @@ class CalculationViewSet(viewsets.GenericViewSet):
         try:
             # Используем новый метод для получения обработанных данных
             processed_data = serializer.validated_data['data_to_calculate']
-            logger.info(f"Данные для разбора: {processed_data}")
+            # logger.info(f"Данные для разбора: {processed_data}")
             data_to_calculate = GetDataToCalculate(processed_data)
         except Exception as e:
             logger.exception("Ошибка получения данных для расчёта")
@@ -706,8 +706,8 @@ class CalculationViewSet(viewsets.GenericViewSet):
                 'error_message': 'Ошибка заполнения данных',
                 'details': str(e)
             }, status=400)
-        else:
-            logger.info(f"Данные для расчёта: {data_to_calculate}")
+        # else:
+        #     logger.info(f"Данные для расчёта: {data_to_calculate}")
 
         try:
             petri_net = PetriNet(data_to_calculate)
@@ -725,6 +725,22 @@ class CalculationViewSet(viewsets.GenericViewSet):
             'calculate': calculate_result,
             'data_to_report': data_to_report,
         })
+
+        # Сохраняем симуляцию только если расчёт прошёл успешно
+        try:            
+            # Сохраняем симуляцию
+            simulation = Simulation.objects.create(
+                input_data=serializer.validated_data,
+                report_data=data_to_report
+            )
+            
+            # Добавляем ID симуляции в ответ
+            response['simulation_id'] = simulation.pk
+            
+        except Exception:
+            logger.exception("Ошибка сохранения симуляции")
+            # Не прерываем выполнение, если не удалось сохранить симуляцию
+            # Просто логируем ошибку
 
         # Сериализуем ответ для документации
         response_serializer = CalculationResponseSerializer(data=response)

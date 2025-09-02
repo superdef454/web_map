@@ -332,3 +332,7 @@ class CalculationResponseSerializer(serializers.Serializer):
         required=False,
         help_text="Данные для формирования отчета"
     )
+    simulation_id = serializers.IntegerField(
+        required=False,
+        help_text="ID симуляции в базе (если есть)"
+    )

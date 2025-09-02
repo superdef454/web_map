@@ -134,5 +134,37 @@ class EI(models.Model):
         verbose_name = 'Единица измерения'
         verbose_name_plural = 'Единицы измерения'
 
-# Simulation
-# Таблица сохранения результатов расчёта (без визуализации онлайн, только данные для ворд файла (или сам ворд файл))
+
+class Simulation(models.Model):
+    """Модель для сохранения результатов расчётов нагрузки транспортной сети"""
+    created_at = models.DateTimeField(
+        verbose_name="Дата создания",
+        auto_now_add=True
+    )
+    
+    # Входные данные для расчёта
+    input_data = models.JSONField(
+        verbose_name="Входные данные для расчёта",
+        help_text="Данные маршрутов, остановок и параметров, переданные для расчёта"
+    )
+
+    # Данные для отчёта
+    report_data = models.JSONField(
+        verbose_name="Данные для отчёта",
+        help_text="Обработанные данные для генерации отчёта"
+    )
+    
+    description = models.TextField(
+        verbose_name="Описание",
+        blank=True,
+        null=True,
+        help_text="Дополнительное описание симуляции"
+    )
+    
+    def __str__(self):
+        return f"<Симуляция {self.pk} {self.created_at.strftime('%d.%m.%Y %H:%M')}>"
+
+    class Meta:
+        verbose_name = 'Симуляция'
+        verbose_name_plural = 'Симуляции'
+        ordering = ['-created_at']

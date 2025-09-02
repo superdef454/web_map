@@ -244,6 +244,7 @@ class Command(BaseCommand):
     def _link_bus_stops_to_route(self, route: Route, element: dict[str, Any], city: City) -> None:
         """Связывает остановки с маршрутом"""
         linked_stops = []
+        list_coord = []
         for member in element.get('members', []):
             if member.get('type') == 'node' and member.get('role') in ['stop', 'platform']:
                 lat = Decimal(str(member['lat']))
@@ -268,8 +269,10 @@ class Command(BaseCommand):
                         # Если найдено несколько остановок, выбираем ближайшую
                         closest_stop = min(nearby_stops, key=lambda stop: distance_to(stop.latitude, stop.longitude))
                         linked_stops.append(closest_stop)
+                        list_coord.append([float(closest_stop.latitude), float(closest_stop.longitude)])
                     else:
                         linked_stops.extend(nearby_stops)
+                        list_coord.extend([[float(stop.latitude), float(stop.longitude)] for stop in nearby_stops])
                 else:
                     bus_stop = BusStop.objects.create(
                         city=city,
@@ -279,6 +282,7 @@ class Command(BaseCommand):
                     )
                     self.bus_stops_created += 1
                     linked_stops.append(bus_stop)
+                    list_coord.append([float(bus_stop.latitude), float(bus_stop.longitude)])
 
         if not linked_stops:
             return
@@ -286,6 +290,8 @@ class Command(BaseCommand):
         # Связываем найденные остановки с маршрутом
         if linked_stops:
             route.busstop.set(linked_stops)
+            route.list_coord = list_coord
+            route.save()
             clean_name = self._clean_unicode_for_logging(route.name)
             logger.debug(f"Связано {len(linked_stops)} остановок с маршрутом {clean_name}")
 
