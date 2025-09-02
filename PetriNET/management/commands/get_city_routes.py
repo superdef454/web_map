@@ -93,6 +93,7 @@ class Command(BaseCommand):
         
         routes_created = 0
         routes_updated = 0
+        self.bus_stops_created = 0
 
         with transaction.atomic():
             for element in routes_data['elements']:
@@ -115,7 +116,10 @@ class Command(BaseCommand):
                     tc = transport_types.get('bus')  # По умолчанию автобус
                 
                 # Извлекаем геометрию маршрута
-                coordinates = self._extract_route_coordinates(element)
+                list_coord_to_render, list_coord = self._extract_route_coordinates(element)
+                
+                if not list_coord or not list_coord_to_render:
+                    continue
                 
                 # Интервал движения (если указан)
                 interval = self._parse_interval(tags.get('interval', ''))
@@ -127,7 +131,9 @@ class Command(BaseCommand):
                     defaults={
                         'tc': tc,
                         'interval': interval,
-                        'list_coord': coordinates,
+                        'list_coord': list_coord,
+                        'list_coord_to_render': list_coord_to_render,
+                        'amount': 1
                     }
                 )
                 
@@ -138,17 +144,18 @@ class Command(BaseCommand):
                     # Обновляем существующий маршрут
                     route.tc = tc
                     route.interval = interval
-                    route.list_coord = coordinates
+                    route.list_coord = list_coord
+                    route.list_coord_to_render = list_coord_to_render
                     route.save()
                     routes_updated += 1
                     logger.debug(f"Обновлен маршрут: {clean_route_name}")
                 
                 # Связываем остановки с маршрутом
-                # self._link_bus_stops_to_route(route, element, city)
+                self._link_bus_stops_to_route(route, element, city)
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'Обработка завершена. Создано: {routes_created}, обновлено: {routes_updated} маршрутов'
+                f'Обработка завершена. Создано: {routes_created}, обновлено: {routes_updated} маршрутов, создано остановок: {self.bus_stops_created}'
             )
         )
 
@@ -188,8 +195,11 @@ class Command(BaseCommand):
         
         return transport_types
 
-    def _extract_route_coordinates(self, element: dict[str, Any]) -> list[list[float]]:
+    def _extract_route_coordinates(self, element: dict[str, Any]) -> tuple[list[list[float]], list[list[float]]]:
         """Извлекает координаты маршрута и корректно упорядочивает"""
+        list_coord_to_render = []
+        list_coord = []
+        
         segments = []
 
         for member in element.get('members', []):
@@ -197,16 +207,14 @@ class Command(BaseCommand):
                 coords = [(pt['lon'], pt['lat']) for pt in member['geometry']]
                 if len(coords) >= 2:  # только линии
                     segments.append(LineString(coords))
-            # elif member.get('type') == 'node':
-            #     # одиночные точки пропускаем или сохраняем отдельно
-            #     lon = member.get('lon')
-            #     lat = member.get('lat')
-            #     if lon is not None and lat is not None:
-            #         # такие точки просто добавим потом в итоговый список
-            #         segments.append(LineString([(lon, lat), (lon, lat)]))  # дублируем точку
+            elif member.get('type') == 'node':
+                lon = member.get('lon')
+                lat = member.get('lat')
+                if lon is not None and lat is not None:
+                    list_coord.append([lat, lon])
 
         if not segments:
-            return []
+            return list_coord_to_render, list_coord
 
         try:
             merged = linemerge(unary_union(segments))
@@ -219,88 +227,67 @@ class Command(BaseCommand):
                 coords = list(longest_line.coords)
             else:
                 coords = []
-
-            return [[lat, lon] for lon, lat in coords]
-
+            
+            list_coord_to_render = [[lat, lon] for lon, lat in coords]
         except Exception as e:
             self.style.WARNING(f"Ошибка при объединении сегментов маршрута {element.get('id')}: {e}")
-            raw_coords = []
+            list_coord_to_render = []
             for seg in segments:
-                raw_coords.extend([[lat, lon] for lon, lat in seg.coords])
-            return raw_coords
+                list_coord_to_render.extend([[lat, lon] for lon, lat in seg.coords])
+
+        return list_coord_to_render, list_coord
 
     def _parse_interval(self, interval_str: str) -> int:
         """Парсит интервал движения из строки"""
-        if not interval_str:
-            return 10  # По умолчанию 10 минут
-            
-        try:
-            # Извлекаем числа из строки
-            numbers = re.findall(r'\d+', interval_str)
-            if numbers:
-                return int(numbers[0])
-        except (ValueError, IndexError):
-            logger.warning(f"Не удалось распарсить интервал: {interval_str}")
-            
         return 10  # По умолчанию
 
     def _link_bus_stops_to_route(self, route: Route, element: dict[str, Any], city: City) -> None:
         """Связывает остановки с маршрутом"""
-        # Собираем ID остановок из членов отношения
-        stop_ids = [
-            member['ref'] for member in element.get('members', [])
-            if member.get('role') in ['stop', 'platform'] and member.get('type') == 'node'
-        ]
-        
-        if not stop_ids:
-            return
-            
-        # Поиск остановок в базе данных по координатам
-        # Сначала получаем координаты остановок через дополнительный запрос
-        try:
-            url = "https://overpass-api.de/api/interpreter"
-            nodes_query = f"""
-            [out:json];
-            (
-              node(id:{','.join(map(str, stop_ids))});
-            );
-            out;
-            """
-            
-            response = requests.get(url, params={'data': nodes_query}, timeout=50000)
-            response.raise_for_status()
-            nodes_data = response.json()
-            
-            linked_stops = []
-            for node in nodes_data.get('elements', []):
-                if node.get('type') != 'node':
-                    continue
-                    
-                lat = Decimal(str(node['lat']))
-                lon = Decimal(str(node['lon']))
-                
+        linked_stops = []
+        for member in element.get('members', []):
+            if member.get('type') == 'node' and member.get('role') in ['stop', 'platform']:
+                lat = Decimal(str(member['lat']))
+                lon = Decimal(str(member['lon']))
+
+                def distance_to(stop_lat: Decimal, stop_lon: Decimal) -> float:
+                    """Вычисляет расстояние до заданной остановки"""
+                    return ((lat - stop_lat) ** 2 + (lon - stop_lon) ** 2).sqrt()
+
                 # Ищем ближайшую остановку в базе данных
-                # Допустимое отклонение в координатах (примерно 100 метров)
-                tolerance = Decimal('0.001')
+                # Допустимое отклонение в координатах (примерно 10 метров)
+                tolerance = Decimal('0.0001')
                 
-                nearby_stops = BusStop.objects.filter(
+                nearby_stops = list(BusStop.objects.filter(
                     city=city,
                     latitude__range=(lat - tolerance, lat + tolerance),
                     longitude__range=(lon - tolerance, lon + tolerance)
-                )
-                
-                if nearby_stops.exists():
-                    linked_stops.extend(nearby_stops)
-            
-            # Связываем найденные остановки с маршрутом
-            if linked_stops:
-                route.busstop.set(linked_stops)
-                clean_name = self._clean_unicode_for_logging(route.name)
-                logger.info(f"Связано {len(linked_stops)} остановок с маршрутом {clean_name}")
-                
-        except (requests.RequestException, ValueError) as e:
+                ))
+
+                if nearby_stops:
+                    if len(nearby_stops) > 1:
+                        # Если найдено несколько остановок, выбираем ближайшую
+                        closest_stop = min(nearby_stops, key=lambda stop: distance_to(stop.latitude, stop.longitude))
+                        linked_stops.append(closest_stop)
+                    else:
+                        linked_stops.extend(nearby_stops)
+                else:
+                    bus_stop = BusStop.objects.create(
+                        city=city,
+                        latitude=lat,
+                        longitude=lon,
+                        name=f'Остановка {member["ref"]}'
+                    )
+                    self.bus_stops_created += 1
+                    linked_stops.append(bus_stop)
+
+        if not linked_stops:
+            return
+
+        # Связываем найденные остановки с маршрутом
+        if linked_stops:
+            route.busstop.set(linked_stops)
             clean_name = self._clean_unicode_for_logging(route.name)
-            logger.warning(f"Не удалось связать остановки с маршрутом {clean_name}: {str(e)}")
+            logger.debug(f"Связано {len(linked_stops)} остановок с маршрутом {clean_name}")
 
     def _clean_unicode_for_logging(self, text: str) -> str:
         """

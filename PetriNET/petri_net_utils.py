@@ -28,13 +28,13 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
     for request_route in request_data_to_calculate['routes']:
         route = Route.objects.filter(city_id=city_id,
                                      id=request_route['id']).prefetch_related('busstop').first()
-        if not route:
-            route = Route.objects.filter(city_id=city_id,
-                                         name__icontains=request_route['name']).prefetch_related('busstop').first()
+        # if not route:
+        #     route = Route.objects.filter(city_id=city_id,
+        #                                  name__icontains=request_route['name']).prefetch_related('busstop').first()
         if route:
             routes.append(route)
         else:
-            logger.warn("Отсутствует маршрут", args={"id": request_route['id']})
+            logger.warning(f"Отсутствует маршрут, ID: {request_route['id']}")
 
     if not routes:
         raise Exception("Отсутствуют маршруты")

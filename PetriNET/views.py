@@ -85,18 +85,15 @@ class CityView(View):
             DistrictList.append(district_geojson)
         
         Routes = Route.objects.filter(city_id=city_id).prefetch_related('busstop')
-        RouteList = []
-        for route in Routes:
-            # if len(route.list_coord) != route.busstop.all().count():
-            #     route.delete()
-            #     continue
-            RouteList.append(
-                {
-                    'name': route.name,
-                    'list_coord': route.list_coord,
-                    'id': route.id
-                }
-            )
+        RouteList = [
+            {
+                "name": route.name,
+                "list_coord": route.list_coord,
+                "list_coord_to_render": route.list_coord_to_render,
+                "id": route.pk,
+            }
+            for route in Routes
+        ]
         RouteList.sort(key=lambda route: len(route['list_coord']), reverse=True)
         response.update(
             {
@@ -176,10 +173,12 @@ class RouteView(View):
         )
         add.busstop.add(*list_bs)
         add.list_coord = list_coord
+        add.list_coord_to_render = list_coord
         add.save()
         return JsonResponse({'error': 0, 'Route': {
             'name': add.name,
             'list_coord': add.list_coord,
+            'list_coord_to_render': add.list_coord_to_render,
             'id': add.id
             }})
 

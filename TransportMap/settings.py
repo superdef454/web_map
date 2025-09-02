@@ -13,6 +13,8 @@ if os.name == 'nt':
     GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', r'C:\OSGeo4W\bin\gdal310.dll')
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', r'C:\OSGeo4W\bin\geos_c.dll')
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
 INSTALLED_APPS = [
     'fontawesomefree',
     'django.contrib.admin',

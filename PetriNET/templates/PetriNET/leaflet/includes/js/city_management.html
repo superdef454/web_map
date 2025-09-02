@@ -44,7 +44,7 @@ function UpdateCityData() {
                 AddBS([BS.latitude, BS.longitude], BS.id, BS.name);
             });
             responseData.RouteList.forEach(Route => {
-                CreateRoute(Route.list_coord, Route.id, Route.name)
+                CreateRoute(Route.list_coord, Route.list_coord_to_render, Route.id, Route.name)
             });
             // Добавляем районы на карту
             if (responseData.DistrictList) {

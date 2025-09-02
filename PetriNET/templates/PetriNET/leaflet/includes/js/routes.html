@@ -2,17 +2,18 @@
 // Функции для работы с маршрутами
 
 // Добавление маршрута в список
-function CreateRoute(list_coord, id, name) {
+function CreateRoute(list_coord, list_coord_to_render, id, name) {
     Routes.push({
         "list_coord": list_coord,
+        "list_coord_to_render": list_coord_to_render,
         "id": id,
         "name": name
     })
 }
 
 // Добавление маршрутов в группу маршрутов на карту
-function DrawRoute(route) {
-    RouteLayer.addLayer(L.polyline(route.list_coord, {
+function DrawRoute(route, use_list_coord_to_render = true) {
+    RouteLayer.addLayer(L.polyline(use_list_coord_to_render ? route.list_coord_to_render : route.list_coord, {
         // color: arrayRandElement(ListColor),
         weight: 3,
         fillOpacity: 0.2,
@@ -38,7 +39,7 @@ function ChoiceOneRoute(id) {
     route = Routes.find(route => route.id == id)
     if (route) {
         RouteLayer.clearLayers();
-        DrawRoute(route);
+        DrawRoute(route, false);
         $("#ChoiceRoute").modal('hide');
     }
     else {
@@ -75,7 +76,7 @@ function DrawRoutsForCalculate() {
     if (RoutesForCalculate.length > 0) {
         RouteLayer.clearLayers();
         RoutesForCalculate.forEach((route, index) => {
-            DrawRoute(route);
+            DrawRoute(route, false);
         })
     }
     else {

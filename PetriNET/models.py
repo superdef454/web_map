@@ -1,8 +1,9 @@
 from decimal import Decimal
+
+from django.contrib.gis.db import models as gis_models
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.forms import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.gis.db import models as gis_models
 
 
 def validate_latitude(value):
@@ -93,6 +94,7 @@ class BusStop(models.Model):
     class Meta:
         verbose_name = 'Остановка'
         verbose_name_plural = 'Остановки'
+        unique_together = ('latitude', 'longitude')
 
         indexes = [
             models.Index(fields=['latitude', 'longitude'])
@@ -110,6 +112,7 @@ class Route(models.Model):
     interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", default=5)
     amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
     list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)
+    list_coord_to_render = models.JSONField('Список координат для рендеринга', null=True)
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
 
     def __str__(self):

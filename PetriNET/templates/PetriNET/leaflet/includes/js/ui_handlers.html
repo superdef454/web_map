@@ -77,7 +77,7 @@ $("#RouteAdd").click(function () {
             },
             success: function (data) {
                 if (JSON.parse(data).error == 0) {
-                    CreateRoute(JSON.parse(data).Route.list_coord, JSON.parse(data).Route.id, JSON.parse(data).Route.name)
+                    CreateRoute(JSON.parse(data).Route.list_coord, JSON.parse(data).Route.list_coord_to_render, JSON.parse(data).Route.id, JSON.parse(data).Route.name)
                     $("#RouteAll").click();
                 }
                 else {

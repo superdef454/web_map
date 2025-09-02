@@ -1,7 +1,8 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from drf_spectacular.utils import extend_schema_field
-from .models import City, TC, BusStop, Route, EI, District
+
+from .models import EI, TC, BusStop, City, District, Route
 
 
 class CitySerializer(serializers.ModelSerializer):
@@ -93,7 +94,7 @@ class RouteDetailSerializer(serializers.ModelSerializer):
         model = Route
         fields = [
             'id', 'name', 'city', 'city_name', 'tc', 'tc_name',
-            'interval', 'amount', 'list_coord', 
+            'interval', 'amount', 'list_coord', 'list_coord_to_render',
             'busstops', 'busstops_count'
         ]
     
@@ -128,7 +129,7 @@ class RouteSerializer(serializers.ModelSerializer):
         model = Route
         fields = [
             'id', 'name', 'city', 'city_name', 'tc', 'tc_name',
-            'interval', 'amount', 'list_coord', 'busstops_count'
+            'interval', 'amount', 'list_coord', 'list_coord_to_render', 'busstops_count'
         ]
     
     def get_busstops_count(self, obj) -> int:
@@ -159,7 +160,7 @@ class RouteCreateUpdateSerializer(serializers.ModelSerializer):
         model = Route
         fields = [
             'id', 'name', 'city', 'tc', 'interval', 
-            'amount', 'list_coord', 'busstop_ids'
+            'amount', 'list_coord', 'list_coord_to_render', 'busstop_ids'
         ]
         
     def create(self, validated_data):
