@@ -611,7 +611,7 @@ def CreateResponseFile(data_to_report: dict) -> str:
         hdr_cells[3].text = 'Средняя длительность пути пассажиров, кол-во ОП'
         hdr_cells[4].text = 'Средняя наполненность автобусов, %'
         hdr_cells[5].text = 'Количество остановок'
-        hdr_cells[6].text = 'Протяжённость'
+        hdr_cells[6].text = 'Протяжённость, км.'
         hdr_cells[7].text = 'Кол-во автобусов на маршруте'
 
         for route in routes:
