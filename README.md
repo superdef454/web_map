@@ -37,7 +37,7 @@ python 3.10.6
 
 -Открыть в терминале папку web_map
 
--Прописать команду: docker compose -f "docker-compose.yml" up -d --build
+-Прописать команду: docker compose -f 'build\docker-compose.yml' up -d --build
 
 *Результат:*
 
@@ -45,13 +45,12 @@ python 3.10.6
 >
 >✔Container web_map-web-1 Started
 
--Перейти на http://127.0.0.1:8000/
+-Перейти на http://127.0.0.1:82/
+Начальный пользователь: admin/admin
 
-*Остановка:* **<span style="color:red">Осторожно, останавливает и удаляет другие контейнеры!</span>**
+*Остановка:*
 
->\$ docker stop $(docker ps -all -q)
->
->\$ docker rm $(docker ps -all -q)
+>docker compose -f 'build\docker-compose.yml' --project-name 'web_map' down
 
 ***Без Docker***
 
