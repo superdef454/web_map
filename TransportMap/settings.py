@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Загрузка переменных окружения из .env файла
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "foo")
 DEBUG = bool(os.environ.get("DEBUG", default=1))
