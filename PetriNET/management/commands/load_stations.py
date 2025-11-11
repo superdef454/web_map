@@ -29,6 +29,7 @@ class Command(BaseCommand):
         out;
         """
         response = requests.get(url, params={'data': query})
+        response.raise_for_status()
         bus_stops_data = response.json()
 
         bus_stops = []

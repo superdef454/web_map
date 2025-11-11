@@ -24,6 +24,30 @@ L.control.attribution({ prefix: 'Маршрутно-транспортные с�
 var lyrOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 var lyrEsriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 
+// Дополнительные карты (популярные в QGIS)
+var lyrOpenTopoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: 'Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap'
+});
+
+var lyrCartoDBPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 20
+});
+
+var lyrCartoDBDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 20
+});
+
+var lyrStamenTerrain = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors, Tiles style by Humanitarian OSM Team',
+    maxZoom: 19,
+    subdomains: 'abc'
+});
+
 // Поверхности объектов
 let BusStops = L.layerGroup().addTo(map);
 let CitysLayer = L.markerClusterGroup().addTo(map);
@@ -33,7 +57,11 @@ let DistrictLayer = L.layerGroup().addTo(map);
 // Настройки карты в правом окошке
 let Maps = {
     "OpenStreetMap": lyrOSM,
-    "ESRI World Imagery": lyrEsriImagery
+    "ESRI World Imagery": lyrEsriImagery,
+    "OpenTopoMap (Топография)": lyrOpenTopoMap,
+    "CartoDB Positron (Светлая)": lyrCartoDBPositron,
+    "CartoDB Dark Matter (Тёмная)": lyrCartoDBDark,
+    "Humanitarian OSM (Гуманитарная)": lyrStamenTerrain
 };
 let hide_view_groups = {
     "Города": CitysLayer,
