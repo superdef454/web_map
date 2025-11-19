@@ -168,11 +168,75 @@ function Сalculation() {
         headers: { 'X-CSRFToken': csrftoken },
         data: JSON.stringify(newFormatData),
         success: function (data) {
-            analysis_of_calculation_result(data)
+            if (data.error === 0) {
+                analysis_of_calculation_result(data)
+            } else {
+                // Обработка ошибок, возвращённых с кодом 200
+                showCalculationError(data, 200)
+            }
         },
-        error: function (jqXHR, exception) {
-            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+        error: function (jqXHR, textStatus, errorThrown) {
+            // Обработка HTTP ошибок (400, 500 и т.д.)
+            let errorData = null;
+            try {
+                errorData = JSON.parse(jqXHR.responseText);
+            } catch (e) {
+                // Если не удалось распарсить JSON
+                errorData = {
+                    error_message: 'Ошибка сервера',
+                    details: jqXHR.responseText || textStatus,
+                    stage: 'unknown'
+                };
+            }
+            showCalculationError(errorData, jqXHR.status)
         }
+    });
+}
+
+// Функция для отображения ошибок расчёта
+function showCalculationError(errorData, statusCode) {
+    let errorMessage = '⚠️ ОШИБКА РАСЧЁТА\n';
+    
+    // Статус HTTP
+    errorMessage += `📊 HTTP статус: ${statusCode}\n`;
+    
+    // Основное сообщение
+    if (errorData.error_message) {
+        errorMessage += `❌ ${errorData.error_message}\n`;
+    }
+    
+    // Этап, на котором произошла ошибка
+    if (errorData.stage) {
+        const stageNames = {
+            'validation': 'Валидация входных данных',
+            'data_preparation': 'Подготовка данных',
+            'petri_net_initialization': 'Инициализация расчётной модели',
+            'calculation': 'Выполнение расчёта',
+            'report_generation': 'Формирование отчёта'
+        };
+        errorMessage += `🔍 Этап ошибки: ${stageNames[errorData.stage] || errorData.stage}\n`;
+    }
+    
+    // Подсказка по исправлению
+    if (errorData.hint) {
+        errorMessage += `💡 Подсказка:\n${errorData.hint}\n`;
+    }
+    
+    // Техническая информация (опционально)
+    if (errorData.details && typeof errorData.details === 'string') {
+        errorMessage += `ℹ️ Детали:\n${errorData.details}`;
+    } else if (errorData.details && typeof errorData.details === 'object') {
+        errorMessage += `ℹ️ Детали:\n${JSON.stringify(errorData.details, null, 2)}`;
+    }
+    
+    // Отображаем сообщение
+    alert(errorMessage);
+    
+    // Логируем в консоль для разработчиков
+    console.error('Calculation Error:', {
+        statusCode: statusCode,
+        errorData: errorData,
+        timestamp: new Date().toISOString()
     });
 }
 

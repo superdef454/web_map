@@ -1,9 +1,10 @@
 import json
 import logging
+import os
 from typing import Any
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import TemplateView
@@ -185,16 +186,32 @@ class RouteView(View):
 
 
 
-def download_report_file(request):
+def download_report_file(request):    
     data_to_report = json.loads(request.POST.get('data_to_report'))
     file_path = ""
     try:
         file_path = CreateResponseFile(data_to_report)
+        
+        # Проверяем существование файла
+        if not os.path.exists(file_path):
+            return JsonResponse({'error': 'Файл не найден'}, status=404)
+        
+        # Получаем имя файла из пути
+        filename = os.path.basename(file_path)
+        
+        # Открываем файл для скачивания с использованием контекстного менеджера
+        response = FileResponse(
+            open(file_path, 'rb'),
+            content_type='application/vnd.openxmlformats-officedocument'
+                        '.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
     except Exception:
         logger.exception('Ошибка формирования файла отчёта')
-    # Возвращаем URL для скачивания файла
-    file_path = file_path
-    return JsonResponse({'file_path': file_path})
+        return JsonResponse({'error': 'Ошибка при создании отчета'}, status=500)
 
 
 @extend_schema_view(
@@ -684,74 +701,257 @@ class CalculationViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'])
     def calculate(self, request):
         """Выполнение расчёта нагрузки транспортной сети"""
+        # Этап 1: Валидация входных данных
+        logger.info("Начало расчёта нагрузки транспортной сети")
+        logger.debug(f"Пользователь: {request.user.username}, IP: {request.META.get('REMOTE_ADDR')}")
+        
         serializer = CalculationRequestSerializer(data=request.data)
         
         if not serializer.is_valid():
+            logger.warning(
+                f"Ошибка валидации входных данных: {serializer.errors}",
+                extra={
+                    'user': request.user.username,
+                    'errors': serializer.errors
+                }
+            )
             return Response({
                 'error': 1,
-                'error_message': 'Ошибка валидации данных',
-                'details': serializer.errors
+                'error_message': 'Ошибка валидации входных данных. Проверьте корректность отправленных данных.',
+                'details': serializer.errors,
+                'stage': 'validation'
             }, status=400)
         
-        response = {'error': 0}
+        logger.info("Валидация входных данных успешно пройдена")
         
+        # Этап 2: Получение и обработка данных из базы данных
         try:
-            # Используем новый метод для получения обработанных данных
             processed_data = serializer.validated_data['data_to_calculate']
-            # logger.info(f"Данные для разбора: {processed_data}")
+            city_id = processed_data.get('city_id')
+            routes_count = len(processed_data.get('routes', []))
+            busstops_count = len(processed_data.get('busstops', {}))
+            
+            logger.info(
+                f"Обработка данных: город ID={city_id}, маршрутов={routes_count}, остановок={busstops_count}"
+            )
+            
             data_to_calculate = GetDataToCalculate(processed_data)
-        except Exception as e:
-            logger.exception("Ошибка получения данных для расчёта")
+            
+            logger.info(
+                f"Данные успешно получены из БД: "
+                f"маршрутов={len(data_to_calculate.get('routes', []))}, "
+                f"остановок={len(data_to_calculate.get('busstops', []))}, "
+                f"направлений={len(data_to_calculate.get('busstops_directions', []))}"
+            )
+            
+        except ValueError as e:
+            logger.exception(
+                "Ошибка в структуре данных при получении данных для расчёта",
+                extra={'user': request.user.username, 'city_id': city_id}
+            )
             return Response({
                 'error': 1,
-                'error_message': 'Ошибка заполнения данных',
-                'details': str(e)
+                'error_message': 'Ошибка в структуре данных для расчёта',
+                'details': str(e),
+                'stage': 'data_preparation',
+                'hint': 'Проверьте корректность указанных ID маршрутов и остановок'
             }, status=400)
-        # else:
-        #     logger.info(f"Данные для расчёта: {data_to_calculate}")
-
-        try:
-            petri_net = PetriNet(data_to_calculate)
-            calculate_result = petri_net.Calculation()
-            data_to_report = petri_net.CreateDataToReport()
+            
+        except KeyError as e:
+            logger.exception(
+                "Отсутствует обязательное поле в данных",
+                extra={'user': request.user.username}
+            )
+            return Response({
+                'error': 1,
+                'error_message': f'Отсутствует обязательное поле: {str(e)}',
+                'details': f'Не найдено поле {str(e)} в данных для расчёта',
+                'stage': 'data_preparation'
+            }, status=400)
+            
         except Exception as e:
-            logger.exception("Ошибка расчёта нагрузки")
+            error_message = str(e)
+            logger.exception(
+                "Непредвиденная ошибка при подготовке данных для расчёта",
+                extra={'user': request.user.username, 'city_id': city_id}
+            )
+            
+            # Определяем специфичные ошибки для пользователя
+            user_message = error_message
+            hint = None
+            
+            if 'Отсутствуют маршруты' in error_message:
+                hint = 'Убедитесь, что выбранные маршруты существуют в базе данных для указанного города'
+            elif 'Отсутствуют остановки' in error_message:
+                hint = 'Добавьте хотя бы одну остановку с пассажирами для начала расчёта'
+            elif 'Отсутствуют пассажиры' in error_message:
+                hint = 'Укажите направления движения и количество пассажиров на остановках'
+                
+            return Response({
+                'error': 1,
+                'error_message': f'Ошибка подготовки данных: {user_message}',
+                'details': error_message,
+                'stage': 'data_preparation',
+                'hint': hint
+            }, status=400)
+
+        # Этап 3: Инициализация сети Петри и выполнение расчёта
+        try:
+            logger.info("Инициализация сети Петри")
+            petri_net = PetriNet(data_to_calculate)
+            
+            logger.info("Запуск расчёта нагрузки")
+            calculate_result = petri_net.Calculation()
+            
+            logger.info(
+                f"Расчёт успешно завершён, временных точек: {len(calculate_result) if calculate_result else 0}"
+            )
+            
+        except ValueError as e:
+            logger.exception(
+                "Ошибка валидации данных при инициализации сети Петри",
+                extra={'user': request.user.username}
+            )
             return Response({
                 'error': 2,
-                'error_message': 'Ошибка расчёта нагрузки',
-                'details': str(e)
+                'error_message': 'Ошибка в данных маршрутов или остановок',
+                'details': str(e),
+                'stage': 'petri_net_initialization',
+                'hint': 'Проверьте корректность координат остановок и структуры маршрутов'
+            }, status=400)
+            
+        except AttributeError as e:
+            logger.exception(
+                "Ошибка доступа к атрибутам объектов при расчёте",
+                extra={'user': request.user.username}
+            )
+            return Response({
+                'error': 2,
+                'error_message': 'Ошибка в структуре данных маршрутов',
+                'details': str(e),
+                'stage': 'calculation',
+                'hint': 'Убедитесь, что для всех маршрутов указаны типы транспорта и количество автобусов'
+            }, status=400)
+            
+        except ZeroDivisionError:
+            logger.exception(
+                "Ошибка деления на ноль при расчёте (вероятно, отсутствуют данные)",
+                extra={'user': request.user.username}
+            )
+            return Response({
+                'error': 2,
+                'error_message': 'Недостаточно данных для расчёта',
+                'details': 'Отсутствуют данные для вычисления средних показателей',
+                'stage': 'calculation',
+                'hint': 'Убедитесь, что на маршрутах есть автобусы и пассажиры'
+            }, status=400)
+            
+        except Exception as e:
+            error_message = str(e)
+            logger.exception(
+                f"Критическая ошибка при выполнении расчёта: {error_message}",
+                extra={'user': request.user.username}
+            )
+            
+            # Определяем специфичные ошибки
+            user_message = error_message
+            hint = None
+            
+            if 'Отсутствуют автобусы на маршрутах' in error_message:
+                hint = 'Укажите количество автобусов и тип транспорта для каждого маршрута'
+            elif 'Не удалось найти остановку для точки маршрута' in error_message:
+                hint = 'Возможно, координаты остановок на маршруте не совпадают с координатами в базе данных'
+            elif 'Неправильное получение длительности пути пассажира' in error_message:
+                hint = 'Проверьте, что конечная остановка пассажира находится после начальной на маршруте'
+                
+            return Response({
+                'error': 2,
+                'error_message': f'Ошибка при выполнении расчёта: {user_message}',
+                'details': error_message,
+                'stage': 'calculation',
+                'hint': hint
             }, status=500)
+        
+        # Этап 4: Формирование данных для отчёта
+        try:
+            logger.info("Формирование данных для отчёта")
+            data_to_report = petri_net.CreateDataToReport()
+            
+            logger.info(
+                f"Данные для отчёта сформированы: "
+                f"остановок={len(data_to_report.get('bus_stops', []))}, "
+                f"маршрутов={len(data_to_report.get('routes', []))}"
+            )
+            
+        except Exception:
+            logger.exception(
+                "Ошибка при формировании данных для отчёта",
+                extra={'user': request.user.username}
+            )
+            return Response({
+                'error': 2,
+                'error_message': 'Ошибка при формировании данных для отчёта',
+                'stage': 'report_generation',
+                'hint': 'Расчёт выполнен, но не удалось сформировать отчёт'
+            }, status=500)
+        
+        # Формирование успешного ответа
+        response = {'error': 0}
         
         if serializer.validated_data.get('get_timeline'):
             response['calculate'] = calculate_result
+            logger.debug(f"Включены данные временной шкалы ({len(calculate_result)} точек)")
 
         response.update({
             'data_to_report': data_to_report,
         })
 
-        # Сохраняем симуляцию только если расчёт прошёл успешно
-        try:            
-            # Сохраняем симуляцию
+        # Этап 5: Сохранение симуляции в базу данных
+        try:
+            logger.info("Сохранение результатов симуляции в БД")
+            
             simulation = Simulation.objects.create(
                 input_data=serializer.validated_data,
                 report_data=data_to_report
             )
             
-            # Добавляем ID симуляции в ответ
             response['simulation_id'] = simulation.pk
             
+            logger.info(f"Симуляция успешно сохранена с ID={simulation.pk}")
+            
         except Exception:
-            logger.exception("Ошибка сохранения симуляции")
+            logger.exception(
+                "Ошибка при сохранении симуляции в БД",
+                extra={'user': request.user.username}
+            )
             # Не прерываем выполнение, если не удалось сохранить симуляцию
-            # Просто логируем ошибку
+            # Расчёт всё равно был успешным
+            logger.warning("Продолжаем выполнение без сохранения симуляции")
 
-        # Сериализуем ответ для документации
-        response_serializer = CalculationResponseSerializer(data=response)
-        if response_serializer.is_valid():
-            return Response(response_serializer.validated_data)
-        else:
-            # Если есть проблемы с сериализацией ответа, возвращаем как есть
-            return Response(response)
+        # Этап 6: Валидация и возврат ответа
+        try:
+            # Не выполняем строгую валидацию, т.к. calculate содержит кортежи
+            # и data_to_report имеет динамическую структуру
+            response_serializer = CalculationResponseSerializer(data=response)
+            if response_serializer.is_valid():
+                logger.info("Расчёт успешно завершён, данные отправлены клиенту")
+                return Response(response_serializer.validated_data, status=200)
+            else:
+                # Логируем ошибки валидации, но все равно возвращаем результат
+                logger.warning(
+                    f"Ошибка валидации ответа (возвращаем данные как есть): {response_serializer.errors}"
+                )
+                logger.info("Расчёт успешно завершён, данные отправлены клиенту")
+                return Response(response, status=200)
+                
+        except Exception:
+            logger.exception(
+                "Ошибка при финальной валидации ответа",
+                extra={'user': request.user.username}
+            )
+            # Всё равно возвращаем результат, т.к. расчёт выполнен успешно
+            logger.info("Расчёт успешно завершён, данные отправлены клиенту (без валидации)")
+            return Response(response, status=200)
 
 
 @extend_schema_view(

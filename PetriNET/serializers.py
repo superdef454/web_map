@@ -288,27 +288,50 @@ class CalculationRequestSerializer(serializers.Serializer):
     )
 
 
-class CalculationResultDataSerializer(serializers.Serializer):
-    """Сериализатор для данных результата расчета"""
-    
-    route_id = serializers.IntegerField(help_text="ID маршрута")
-    route_name = serializers.CharField(help_text="Название маршрута")
-    load_factor = serializers.FloatField(help_text="Коэффициент загрузки")
-    passenger_flow = serializers.IntegerField(help_text="Пассажиропоток")
-    vehicle_count = serializers.IntegerField(help_text="Количество транспортных средств")
+class BusStopReportSerializer(serializers.Serializer):
+    """Сериализатор для данных остановки в отчете"""
+    bus_name = serializers.CharField(help_text="Название остановки")
+    passengers_count = serializers.IntegerField(help_text="Количество пассажиров")
+    max_waiting_time = serializers.IntegerField(
+        required=False,
+        help_text="Максимальное время ожидания в минутах"
+    )
+    routes_count = serializers.CharField(
+        required=False,
+        help_text="Количество маршрутов"
+    )
+
+
+class RouteReportSerializer(serializers.Serializer):
+    """Сериализатор для данных маршрута в отчете"""
+    name = serializers.CharField(help_text="Название маршрута")
+    TC = serializers.CharField(required=False, help_text="Тип транспортного средства")
     interval = serializers.FloatField(help_text="Интервал движения в минутах")
+    average_passengers_stops_count = serializers.FloatField(
+        help_text="Средняя длительность пути пассажиров (кол-во ОП)"
+    )
+    average_fullness = serializers.CharField(help_text="Средняя наполненность автобусов")
+    bus_stop_count = serializers.IntegerField(help_text="Количество остановок")
+    route_length = serializers.FloatField(help_text="Протяжённость маршрута в км")
+    TC_count = serializers.IntegerField(
+        required=False,
+        help_text="Количество автобусов на маршруте"
+    )
 
 
 class ReportDataSerializer(serializers.Serializer):
     """Сериализатор для данных отчета"""
-    
-    calculation_date = serializers.DateTimeField(help_text="Дата и время расчета")
-    total_routes = serializers.IntegerField(help_text="Общее количество маршрутов")
-    avg_load_factor = serializers.FloatField(help_text="Средний коэффициент загрузки")
-    total_passenger_flow = serializers.IntegerField(help_text="Общий пассажиропоток")
-    routes_data = CalculationResultDataSerializer(
-        many=True, 
-        help_text="Детальные данные по каждому маршруту"
+    city_name = serializers.CharField(help_text="Название города")
+    data = serializers.CharField(help_text="Дата и время расчета")
+    bus_stops = BusStopReportSerializer(
+        many=True,
+        required=False,
+        help_text="Данные по остановкам"
+    )
+    routes = RouteReportSerializer(
+        many=True,
+        required=False,
+        help_text="Данные по маршрутам"
     )
 
 
@@ -323,10 +346,9 @@ class CalculationResponseSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="Сообщение об ошибке (если error != 0)"
     )
-    calculate = CalculationResultDataSerializer(
-        many=True,
+    calculate = serializers.ListField(
         required=False,
-        help_text="Результаты расчета по маршрутам"
+        help_text="Временная шкала расчета (список кортежей: время, данные)"
     )
     data_to_report = ReportDataSerializer(
         required=False,

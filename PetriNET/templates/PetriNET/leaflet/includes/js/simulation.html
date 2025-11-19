@@ -153,27 +153,47 @@ function DownloadReport() {
         return
     }
     const csrftoken = getCookie('csrftoken');
-    $.ajax({
-        url: '{% url "PetriNET:download_report_file" %}',
-        method: 'post',
-        dataType: 'html',
-        headers: { 'X-CSRFToken': csrftoken },
-        data: {
-            "data_to_report": JSON.stringify(simulation_data.data_to_report),
+    
+    // Используем fetch API для скачивания файла
+    fetch('{% url "PetriNET:download_report_file" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
-        success: function (response) {
-            // Создаём временную ссылку для скачивания файла
-            const link = document.createElement('a');
-            const currentUrl = window.location.href;
-            link.href = currentUrl + JSON.parse(response).file_path;
-            link.setAttribute('download', ''); // Необходимо для некоторых браузеров
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        },
-        error: function (jqXHR, exception) {
-            alert(`Ошибка сервера\nСтатус: ${jqXHR.status}\nИсключение: ${exception}`)
+        body: new URLSearchParams({
+            'data_to_report': JSON.stringify(simulation_data.data_to_report)
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Ошибка сервера: ' + response.status);
         }
+        // Получаем имя файла из заголовка Content-Disposition
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'report.docx';
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+            if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1];
+            }
+        }
+        return response.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
+        // Создаём временную ссылку для скачивания файла
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+        console.error('Ошибка при скачивании файла:', error);
+        alert('Ошибка при скачивании файла: ' + error.message);
     });
 }
 </script>
