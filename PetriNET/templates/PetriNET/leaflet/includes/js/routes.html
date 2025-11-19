@@ -32,7 +32,7 @@ function DrawDashedRoute(route, use_list_coord_to_render = true) {
 
 // Показать все маршруты
 function ShowAllRoutes() {
-    if (!CityExists()) {
+    if (!CityExists(alert_if_not=false)) {
         return
     }
     RouteLayer.clearLayers();

@@ -250,25 +250,73 @@ function PetriFileProcess(files) {
             reader.onload = function (e) {
                 let DataToCalculate = JSON.parse(e.target.result)
                 try {
-                    if (DataToCalculate.city_id != CurrentCity.id) {
-                        throw `Не правильно выбран город. Нужно: ${DataToCalculate.city_id}, ваш: ${CurrentCity.id}`;
+                    // Проверяем наличие обязательных полей
+                    if (!DataToCalculate.city_id) {
+                        throw 'В файле отсутствует информация о городе (city_id)';
                     }
-                    BSPassengersDirections = DataToCalculate.busstops
-                    RoutesForCalculate = Routes.filter(route =>
-                        DataToCalculate.routes.some(rout => rout.id == route.id)
-                    );
-                    SetChoiceRouteForCalculate()
-                    RoutesForCalculate.forEach((route, index) => {
-                        $(`#RouteCheckbox${route.id}`).addClass("active").attr('aria-pressed="true"')
-                    })
+                    
+                    // Проверяем, нужно ли переключить город
+                    const needCityChange = !CurrentCity || CurrentCity.id != DataToCalculate.city_id;
+                    
+                    if (needCityChange) {
+                        const currentCityId = CurrentCity ? CurrentCity.id : 'не выбран';
+                        console.log(`Переключение с города ${currentCityId} на город ${DataToCalculate.city_id} из файла`);
+                        
+                        // Ищем город с нужным ID в списке городов
+                        const cityToSelect = citys.find(city => city.id == DataToCalculate.city_id);
+                        if (cityToSelect) {
+                            // Переключаемся на нужный город
+                            ChoiceCity(cityToSelect.id);
+                            
+                            // Даем время на загрузку данных города перед применением данных из файла
+                            setTimeout(() => {
+                                applyFileData(DataToCalculate);
+                            }, 500);
+                            return;
+                        } else {
+                            throw `Город с ID ${DataToCalculate.city_id} не найден в системе`;
+                        }
+                    }
+                    
+                    // Если город уже выбран правильный, применяем данные сразу
+                    applyFileData(DataToCalculate);
+                    
                 } catch (e) {
                     Reset()
-                    alert(e)
+                    alert('Ошибка загрузки файла:\n' + e)
+                    console.error('Ошибка разбора файла:', e)
                 }
             };
             reader.readAsText(file);
+        } else {
+            alert('Неверный формат файла. Пожалуйста, выберите JSON файл.');
         }
         $("#FilePetri").val(null);
     }
+}
+
+// Вспомогательная функция для применения данных из файла
+function applyFileData(DataToCalculate) {
+    // Устанавливаем данные остановок с пассажирами
+    BSPassengersDirections = DataToCalculate.busstops
+    
+    // Фильтруем маршруты, которые указаны в файле
+    RoutesForCalculate = Routes.filter(route =>
+        DataToCalculate.routes.some(rout => rout.id == route.id)
+    );
+    
+    // Обновляем интерфейс выбора маршрутов
+    SetChoiceRouteForCalculate()
+    
+    // Отмечаем выбранные маршруты как активные
+    RoutesForCalculate.forEach((route, index) => {
+        $(`#RouteCheckbox${route.id}`).addClass("active").attr('aria-pressed', 'true')
+    })
+    
+    console.log('Файл успешно загружен:', {
+        city_id: DataToCalculate.city_id,
+        routes_count: RoutesForCalculate.length,
+        busstops_count: Object.keys(BSPassengersDirections).length
+    });
 }
 </script>

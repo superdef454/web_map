@@ -18,12 +18,14 @@ function getCookie(name) {
 }
 
 // Функция проверки выбора города
-function CityExists() {
+function CityExists(alert_if_not=true) {
     if (CurrentCity) {
         return true
     }
     else {
-        alert('Выберите город');
+        if (alert_if_not) {
+            alert('Выберите город');
+        }
         return false
     }
 }
