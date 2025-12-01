@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import heapq
 import logging
 import os
 import random
@@ -19,6 +20,7 @@ logger = logging.getLogger('PetriNetManager')
 fake = Faker("ru_RU")
 
 MAX_PASSENGERS_COUNT_FOR_RESPONSE = 10
+MAX_TIMEPOINTS_FOR_RESPONSE = 5000  # Лимит таймпоинтов для экономии памяти
 
 
 def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
@@ -111,70 +113,69 @@ class PetriNet():
 
     class Bus():
         """Автобус"""
+        __slots__ = ('route', 'bus_id', 'capacity', 'route_list', 'bus_stop_ids',
+                     'bus_stop_index_now', 'passengers', '_busstops_cache')
+
         def __init__(self, route: Route, bus_id) -> None:
             # К какому маршруту относится
             self.route = route
             self.bus_id = bus_id
             # Вместимость
             self.capacity = self.route.tc.capacity
+            # Кэшируем остановки маршрута для быстрого доступа
+            self._busstops_cache = {}
+            for bs in self.route.busstop.all():
+                key = (float(bs.latitude), float(bs.longitude))
+                self._busstops_cache[key] = bs.id
             # Координаты пути
-            self.route_list = [self.serialize_route_point(point) for point in self.route.list_coord.copy()]
-            self.bus_stop_ids = [bs.id for bs in self.route.busstop.all()]
+            self.route_list = [self.serialize_route_point(point) for point in self.route.list_coord]
+            self.bus_stop_ids = [point['bus_stop_id'] for point in self.route_list]
             # Индекс остановки из пути
             self.bus_stop_index_now = 0
             # Пассажиры внутри
             self.passengers = []
-            # Наверное сюда можно статистику добавить
 
         @property
         def get_rest_route(self) -> list[int]:
             """Получение списка id оставшихся ОП до конечной"""
             if self.ending_station():
-                route_list = self.route_list.copy()
-                route_list.reverse()
-                return [point['bus_stop_id'] for point in route_list[0:]]
-            return [point['bus_stop_id'] for point in self.route_list[self.bus_stop_index_now:]]
+                # Возвращаем обратный путь
+                return [self.route_list[i]['bus_stop_id'] 
+                        for i in range(len(self.route_list) - 1, -1, -1)]
+            return [self.route_list[i]['bus_stop_id'] 
+                    for i in range(self.bus_stop_index_now, len(self.route_list))]
+
+        @property
+        def get_rest_route_set(self) -> set[int]:
+            """Получение множества id оставшихся ОП (для быстрой проверки вхождения)"""
+            if self.ending_station():
+                return set(self.bus_stop_ids)
+            return {self.route_list[i]['bus_stop_id'] 
+                    for i in range(self.bus_stop_index_now, len(self.route_list))}
 
         def serialize_route_point(self, point: list):
             # Удобное хранение данных маршрута
-            tolerance = Decimal('0.0001')
-
-            bus_stop_id = 0
             lat, lon = point[0], point[1]
             
-            # Сначала пробуем точное совпадение
-            for bs in self.route.busstop.all():
-                if lat == float(bs.latitude) and lon == float(bs.longitude):
-                    bus_stop_id = bs.id
-                    break
+            # Сначала пробуем точное совпадение из кэша
+            bus_stop_id = self._busstops_cache.get((lat, lon), 0)
             
             # Если точное совпадение не найдено, ищем в радиусе tolerance
             if bus_stop_id == 0:
-                nearby_stops = []
-                for bs in self.route.busstop.all():
-                    bs_lat = float(bs.latitude)
-                    bs_lon = float(bs.longitude)
-                    if (bs_lat >= lat - float(tolerance) and bs_lat <= lat + float(tolerance) and
-                        bs_lon >= lon - float(tolerance) and bs_lon <= lon + float(tolerance)):
-                        nearby_stops.append(bs)
-                
-                if nearby_stops:
-                    if len(nearby_stops) > 1:
-                        # Если найдено несколько остановок, выбираем ближайшую
-                        closest_stop = min(nearby_stops, key=lambda stop: 
-                                         get_travel_range(lat, lon, float(stop.latitude), float(stop.longitude)))
-                        bus_stop_id = closest_stop.id
-                    else:
-                        bus_stop_id = nearby_stops[0].id
+                tolerance = 0.0001
+                for (bs_lat, bs_lon), bs_id in self._busstops_cache.items():
+                    if (abs(bs_lat - lat) <= tolerance and abs(bs_lon - lon) <= tolerance):
+                        bus_stop_id = bs_id
+                        break
             
             if bus_stop_id == 0:
-                raise Exception(f"Не удалось найти остановку для точки маршрута: {point}, {self.route.id}. Переформируйте маршрут.")
+                raise Exception(f"Не удалось найти остановку для точки маршрута: {point}, {self.route.id}")
 
             return {
                 "bus_stop_id": bus_stop_id,
                 "latitude": lat,
                 "longitude": lon,
-                }
+            }
 
         def ending_station(self) -> bool:
             """Проверяет конечную станцию"""
@@ -279,22 +280,22 @@ class PetriNet():
                 "end": self.end_bus_stop_id
             }
 
-    class TimeLine():
+    class TimeLine:
         """Порядок расчёта, класс работы с таймлайном"""
+        __slots__ = ('timeline', 'timeline_heap', 'bus_stops_now', 'data_to_response', 
+                     'response_count', 'sample_interval')
+
         def __init__(self, bus_stops_now: dict) -> None:
-            self.timeline = {}
-            # Указатель на автобусы из расчёта
+            self.timeline = {}  # seconds -> action
+            self.timeline_heap = []  # heapq для быстрого получения минимума
             self.bus_stops_now = bus_stops_now
-            # Данные для отправки на страницу расчёта
             self.data_to_response = []
+            self.response_count = 0
+            # Интервал семплирования (сохраняем каждый N-ый таймпоинт)
+            self.sample_interval = 1
 
         def add_timepoint(self, seconds_from_start: int, action: dict):
-            """
-            Функция добавление действиея в очередь
-
-            seconds_from_start - Количество секунд со старта расчёта
-            action - Данные в этот момент времени
-            """
+            """Добавление действия в очередь"""
             if seconds_from_start in self.timeline:
                 action_in_timeline = self.timeline[seconds_from_start]
                 for key, value in action.items():
@@ -304,44 +305,59 @@ class PetriNet():
                         action_in_timeline[key] = value
             else:
                 self.timeline[seconds_from_start] = action
+                heapq.heappush(self.timeline_heap, seconds_from_start)
 
         def add_list_timepoints(self, list_timepoints: list) -> None:
-            """
-            Добавления списка действий в очередь
-            """
+            """Добавления списка действий в очередь"""
             for action in list_timepoints:
                 self.add_timepoint(seconds_from_start=action['seconds_from_start'],
                                    action=action['action'])
 
         def process_item_for_responce(self, item: dict) -> dict:
-            item_for_responce = item.copy()
+            """Сериализация данных для ответа"""
+            item_for_responce = {}
             for key, value in item.items():
                 if isinstance(value, list):
                     item_for_responce[key] = [v.to_dict() for v in value]
                 else:
                     item_for_responce[key] = value.to_dict()
             # Отправляем только остановки с пассажирами
-            item_for_responce["BusStops"] = [bus_stop.to_dict() for bus_stop in self.bus_stops_now.values() if
-                                             bus_stop.passengers]
+            item_for_responce["BusStops"] = [
+                bus_stop.to_dict() for bus_stop in self.bus_stops_now.values() 
+                if bus_stop.passengers
+            ]
             return item_for_responce
 
+        def _should_save_response(self) -> bool:
+            """Проверяет, нужно ли сохранять этот таймпоинт"""
+            self.response_count += 1
+            # Адаптивное семплирование: увеличиваем интервал при большом кол-ве точек
+            if len(self.data_to_response) > MAX_TIMEPOINTS_FOR_RESPONSE:
+                self.sample_interval = max(2, len(self.data_to_response) // MAX_TIMEPOINTS_FOR_RESPONSE)
+            return self.response_count % self.sample_interval == 0
+
         def add_data_to_response(self, seconds_from_start: int, action: dict) -> None:
-            """Добавляет действие для отрисовки"""
-            self.data_to_response.append((seconds_from_start, self.process_item_for_responce(action)))
+            """Добавляет действие для отрисовки (с семплированием)"""
+            if self._should_save_response():
+                self.data_to_response.append(
+                    (seconds_from_start, self.process_item_for_responce(action))
+                )
 
         def pop_first_timepoint(self) -> tuple[int, dict]:
-            if not self.timeline:
+            """Извлечение первого (минимального) таймпоинта"""
+            if not self.timeline_heap:
                 return None, None
-            first_seconds_from_start, _ = self.get_first_timepoint()
-            first_action = self.timeline.pop(first_seconds_from_start)
-            self.data_to_response.append((first_seconds_from_start, self.process_item_for_responce(first_action)))
-            return first_seconds_from_start, first_action
-
-        def get_first_timepoint(self) -> tuple[int, dict]:
-            list_actions = [key for key in self.timeline.keys()]
-            list_actions.sort()
-            first_key = list_actions[0]
-            return first_key, self.timeline[first_key]
+            # Пропускаем уже удалённые элементы
+            while self.timeline_heap:
+                first_seconds = heapq.heappop(self.timeline_heap)
+                if first_seconds in self.timeline:
+                    first_action = self.timeline.pop(first_seconds)
+                    if self._should_save_response():
+                        self.data_to_response.append(
+                            (first_seconds, self.process_item_for_responce(first_action))
+                        )
+                    return first_seconds, first_action
+            return None, None
 
     def __init__(self, data_to_calculate: dict = {}) -> None:
         self.data_to_calculate = data_to_calculate
@@ -408,89 +424,85 @@ class PetriNet():
 
         self.timeline.add_list_timepoints(add_timepoints)
 
+    def _exists_pass_in_bus_path(self, bus_stop_ids_set: set[int]) -> bool:
+        """Проверяем есть ли пассажиры на пути автобуса"""
+        for busstop in self.busstops.values():
+            if busstop.passengers and busstop.bus_stop.id in bus_stop_ids_set:
+                return True
+        return False
+
     def Calculation(self):
         """Модуль расчёта"""
-        # Получаем первый таймпоинт
-        this_seconds_from_start: int | None
-        this_action: dict | None
         this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
-        # Проходим по всем таймпоинтам
-        while this_seconds_from_start or this_action:
-            # Проверяем все автобусы в таймпоинте
-            bus: PetriNet.Bus
-            for bus in this_action["Bus"].copy():
-                # Сколько временя заняло действие
-                time_delta: int = 0
-                # id текущей остановки автобуса
-                bus_stop_id_now: int = bus.route_list[bus.bus_stop_index_now]["bus_stop_id"]
-                # Сначала высаживаются из автобуса
-                pas: PetriNet.Passenger
-                for pas in bus.passengers.copy():
-                    # Если конечная точка пассажира совпадает с текущей автобуса
+        
+        while this_seconds_from_start is not None:
+            buses = this_action.get("Bus", [])
+            
+            for bus in buses:
+                time_delta = 0
+                bus_stop_id_now = bus.route_list[bus.bus_stop_index_now]["bus_stop_id"]
+                current_busstop = self.busstops[bus_stop_id_now]
+                route_stats = self.data_to_report['routes'][bus.route.id]
+                
+                # Высадка пассажиров - фильтруем список один раз
+                passengers_to_remove = []
+                for pas in bus.passengers:
                     if pas.end_bus_stop_id == bus_stop_id_now:
-                        # Пассажир прибыл в место назначения
-                        bus.passengers.remove(pas)
+                        passengers_to_remove.append(pas)
                         time_delta += self.passenger_time
-                # Добавить таймпоинт после высадки людей
+                
+                for pas in passengers_to_remove:
+                    bus.passengers.remove(pas)
+                
                 if time_delta:
                     this_seconds_from_start += time_delta
                     time_delta = 0
                     self.timeline.add_data_to_response(this_seconds_from_start, bus.get_action())
-                # Заходят пассажиры, которые могут доехать до своей остановки
-                for pas in self.busstops[bus_stop_id_now].passengers.copy():
-                    # Если конечная точка пассажира есть в оставшемся пути автобуса (до конечной),
-                    # и места в автобусе ещё есть
-                    if pas.end_bus_stop_id in bus.get_rest_route and len(bus.passengers) < bus.capacity:
-                        # Пассажир уходит с остановки
-                        self.busstops[bus_stop_id_now].passengers.remove(pas)
-                        # Садится в автобус
-                        bus.passengers.append(pas)
-                        # Считается средняя длительность пути пассажиров
-                        self.data_to_report['routes'][bus.route.id]['average_passengers_stops_count'][0] +=\
-                            pas.get_route_count(bus.get_rest_route)
-                        self.data_to_report['routes'][bus.route.id]['average_passengers_stops_count'][1] += 1
-                        # Это занимает некоторое время
-                        time_delta += self.passenger_time
-                # Добавить таймпоинт после посадки людей
+                
+                # Посадка пассажиров - используем set для быстрой проверки
+                rest_route_set = bus.get_rest_route_set
+                passengers_to_board = []
+                available_seats = bus.capacity - len(bus.passengers)
+                
+                for pas in current_busstop.passengers:
+                    if available_seats <= 0:
+                        break
+                    if pas.end_bus_stop_id in rest_route_set:
+                        passengers_to_board.append(pas)
+                        available_seats -= 1
+                
+                for pas in passengers_to_board:
+                    current_busstop.passengers.remove(pas)
+                    bus.passengers.append(pas)
+                    # Считаем статистику
+                    rest_route = bus.get_rest_route
+                    route_stats['average_passengers_stops_count'][0] += pas.get_route_count(rest_route)
+                    route_stats['average_passengers_stops_count'][1] += 1
+                    time_delta += self.passenger_time
+                
                 if time_delta:
                     this_seconds_from_start += time_delta
                     time_delta = 0
                     self.timeline.add_data_to_response(this_seconds_from_start, bus.get_action())
 
-                def exists_pass_in_bus_path(bus_stop_ids: list[int]) -> bool:
-                    """Проверяем есть ли пассажиры на пути автобуса"""
-                    stop_intersections: set[int] = set(bus_stop_ids) & \
-                        {busstop.bus_stop.id for busstop in self.busstops.values() if busstop.passengers}
-                    return bool(stop_intersections)
-
-                # Автобус отправляется на следующую остановку,
-                # если она конечная: если есть пассажиры на его пути или в нём едем дальше, иначе останавливаемся
-                if (bus.ending_station() or bus.start_station()) and not bus.passengers and not exists_pass_in_bus_path(bus.bus_stop_ids):
-                    # В этот момент можно у маркера отключить анимацию
-                    # Автобус завершил работу - на маршруте больше нет пассажиров
-                    pass
-                else:
-                    # При достижении начальной остановки, если за последние route.interval минут выезжал автобус
-                    if bus.ending_station() and not bus.chech_of_travel_permit(self.busstops[bus_stop_id_now],
-                                                                               this_seconds_from_start):
-                        # Этот автобус ждёт route.interval минут
+                # Проверка завершения работы автобуса
+                bus_stop_ids_set = set(bus.bus_stop_ids)
+                is_terminal = bus.ending_station() or bus.start_station()
+                should_stop = is_terminal and not bus.passengers and not self._exists_pass_in_bus_path(bus_stop_ids_set)
+                
+                if not should_stop:
+                    if bus.ending_station() and not bus.chech_of_travel_permit(current_busstop, this_seconds_from_start):
                         time_delta += bus.route.interval * 60
                     else:
-                        # Устанавливаем остановке последнее время отправления для текущего маршрута
-                        self.busstops[bus_stop_id_now].set_last_start_bus_time(bus.route.id, this_seconds_from_start)
-                        # Добавляем время пути до следующей остановки
+                        current_busstop.set_last_start_bus_time(bus.route.id, this_seconds_from_start)
                         time_delta += bus.get_travel_time()
-                        # Считаем среднюю наполненность
-                        self.data_to_report['routes'][bus.route.id]['average_fullness'][0] += len(bus.passengers)
-                        self.data_to_report['routes'][bus.route.id]['average_fullness'][1] += 1
-                        # Считаем завершённый рейс когда автобус достигает конечной остановки
+                        route_stats['average_fullness'][0] += len(bus.passengers)
+                        route_stats['average_fullness'][1] += 1
                         if bus.ending_station():
-                            self.data_to_report['routes'][bus.route.id]['completed_trips'] += 1
-                        # Передвигаем автобус
+                            route_stats['completed_trips'] += 1
                         bus.drive_to_next_bus_stop()
-                    this_action["Bus"].remove(bus)
-                    # Добавляем следующий таймпоинт в таймлайн
                     self.timeline.add_timepoint(this_seconds_from_start + time_delta, bus.get_action())
+            
             this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
         self.timeline.data_to_response.sort(key=lambda i: i[0])
         return self.timeline.data_to_response

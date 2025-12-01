@@ -11,6 +11,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from pyinstrument import Profiler
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -711,6 +712,10 @@ class CalculationViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'])
     def calculate(self, request):
         """Выполнение расчёта нагрузки транспортной сети"""
+        # Инициализация профайлера
+        profiler = Profiler()
+        profiler.start()
+        
         # Этап 1: Валидация входных данных
         logger.info("Начало расчёта нагрузки транспортной сети")
         logger.debug(f"Пользователь: {request.user.username}, IP: {request.META.get('REMOTE_ADDR')}")
@@ -940,6 +945,15 @@ class CalculationViewSet(viewsets.GenericViewSet):
 
         # Этап 6: Валидация и возврат ответа
         try:
+            # Останавливаем профайлер и выводим результаты
+            profiler.stop()
+            profile_output = profiler.output_text(unicode=True, color=False)
+            logger.info("=== ПРОФАЙЛИНГ РАСЧЁТА ===\n")
+            # Также сохраняем в файл для удобства анализа
+            with open('log/profile_calculate.txt', 'w', encoding='utf-8') as f:
+                f.write(profile_output)
+            logger.info("Профиль сохранён в log/profile_calculate.txt")
+            
             # Не выполняем строгую валидацию, т.к. calculate содержит кортежи
             # и data_to_report имеет динамическую структуру
             response_serializer = CalculationResponseSerializer(data=response)
@@ -955,6 +969,7 @@ class CalculationViewSet(viewsets.GenericViewSet):
                 return Response(response, status=200)
                 
         except Exception:
+            profiler.stop()
             logger.exception(
                 "Ошибка при финальной валидации ответа",
                 extra={'user': request.user.username}
