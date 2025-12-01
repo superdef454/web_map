@@ -116,7 +116,7 @@ class Route(models.Model):
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
 
     def __str__(self):
-        return self.name
+        return f"{self.city.name}: {self.name}"
 
     class Meta:
         verbose_name = 'Маршрут'
@@ -133,6 +133,87 @@ class EI(models.Model):
     class Meta:
         verbose_name = 'Единица измерения'
         verbose_name_plural = 'Единицы измерения'
+
+
+class PassengerFlow(models.Model):
+    """Модель сценария пассажиропотока"""
+    city = models.ForeignKey(
+        City,
+        verbose_name="Город",
+        on_delete=models.CASCADE,
+        related_name='passenger_flows'
+    )
+    routes = models.ManyToManyField(
+        Route,
+        verbose_name="Маршруты",
+        blank=True,
+        related_name='passenger_flows',
+        help_text="Маршруты, участвующие в сценарии"
+    )
+    name = models.CharField(
+        verbose_name="Название сценария",
+        max_length=250
+    )
+    description = models.TextField(
+        verbose_name="Описание сценария",
+        blank=True,
+        null=True
+    )
+    created_at = models.DateTimeField(
+        verbose_name="Дата создания",
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        verbose_name="Дата обновления",
+        auto_now=True
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.city.name})"
+
+    class Meta:
+        verbose_name = 'Сценарий пассажиропотока'
+        verbose_name_plural = 'Сценарии пассажиропотока'
+        ordering = ['-created_at']
+
+
+class PassengerFlowEntry(models.Model):
+    """Модель для описания записи пассажиропотока (откуда-куда и сколько)"""
+    passenger_flow = models.ForeignKey(
+        PassengerFlow,
+        verbose_name="Сценарий пассажиропотока",
+        on_delete=models.CASCADE,
+        related_name='entries'
+    )
+    from_stop = models.ForeignKey(
+        BusStop,
+        verbose_name="Остановка отправления",
+        on_delete=models.CASCADE,
+        related_name='passenger_flow_from'
+    )
+    to_stop = models.ForeignKey(
+        BusStop,
+        verbose_name="Остановка назначения",
+        on_delete=models.CASCADE,
+        related_name='passenger_flow_to',
+        blank=True,
+        null=True,
+        help_text="Если не указано, пассажиры распределяются по маршруту"
+    )
+    passengers_count = models.PositiveIntegerField(
+        verbose_name="Количество пассажиров",
+        validators=[MinValueValidator(1)],
+        help_text="Количество людей, следующих по данному направлению"
+    )
+
+    def __str__(self):
+        to_stop_name = self.to_stop.name if self.to_stop else "любую остановку"
+        return f"{self.from_stop.name} → {to_stop_name}: {self.passengers_count} чел."
+
+    class Meta:
+        verbose_name = 'Запись пассажиропотока'
+        verbose_name_plural = 'Записи пассажиропотока'
+        ordering = ['from_stop__name']
 
 
 class Simulation(models.Model):
