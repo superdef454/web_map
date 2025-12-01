@@ -29,19 +29,42 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
 
     # Получения маршрутов из бд
     routes = []
+    invalid_routes = []  # Маршруты с ошибками
     for request_route in request_data_to_calculate['routes']:
         route = Route.objects.filter(city_id=city_id,
                                      id=request_route['id']).prefetch_related('busstop').first()
-        # if not route:
-        #     route = Route.objects.filter(city_id=city_id,
-        #                                  name__icontains=request_route['name']).prefetch_related('busstop').first()
         if route:
-            routes.append(route)
+            # Проверка корректности маршрута
+            errors = []
+            
+            if not route.tc:
+                errors.append("не указан тип ТС")
+            elif route.tc.capacity < 1:
+                errors.append(f"вместимость ТС меньше 1 ({route.tc.capacity})")
+            
+            if not route.amount or route.amount < 1:
+                errors.append(f"кол-во автобусов меньше 1 ({route.amount})")
+            
+            if not route.interval or route.interval < 1:
+                errors.append(f"интервал движения меньше 1 ({route.interval})")
+            
+            if not route.list_coord or len(route.list_coord) < 2:
+                errors.append("маршрут должен содержать минимум 2 остановки")
+            
+            if errors:
+                invalid_routes.append(f"Маршрут '{route.name}' (ID={route.id}): {', '.join(errors)}")
+                logger.warning(f"Маршрут {route.id} не прошёл валидацию: {', '.join(errors)}")
+            else:
+                routes.append(route)
         else:
             logger.warning(f"Отсутствует маршрут, ID: {request_route['id']}")
 
-    if not routes:
-        raise Exception("Отсутствуют маршруты")
+    if not routes or invalid_routes:
+        error_msg = "Отсутствуют корректные маршруты для расчёта"
+        if invalid_routes:
+            error_msg += ". Ошибки: " + "; ".join(invalid_routes)
+        raise Exception(error_msg)
+    
     DataToCalculate['routes'] = routes
 
     # Получение остановок и путей пассажиров

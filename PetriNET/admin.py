@@ -39,8 +39,44 @@ class ClassRouteAdmin(admin.ModelAdmin):
 class ClassBusStopAdmin(admin.ModelAdmin):
     list_filter = ('city',)
     search_fields = ('name',)
-    list_display = ('name', 'city')
+    list_display = ('name', 'city', 'routes_count')
+    readonly_fields = ('routes_list',)
     save_on_top = True
+    
+    fieldsets = (
+        (None, {
+            'fields': ('city', 'name', 'latitude', 'longitude')
+        }),
+        ('Маршруты', {
+            'fields': ('routes_list',),
+            'description': 'Маршруты, проходящие через эту остановку'
+        }),
+    )
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        from django.db.models import Count
+        queryset = queryset.annotate(_routes_count=Count('route'))
+        return queryset
+
+    def routes_count(self, obj):
+        """Количество маршрутов, проходящих через остановку"""
+        return obj._routes_count
+    routes_count.short_description = 'Маршрутов'
+    routes_count.admin_order_field = '_routes_count'
+
+    def routes_list(self, obj):
+        """Список маршрутов, проходящих через остановку"""
+        routes = obj.route_set.all()
+        if not routes:
+            return "Нет маршрутов"
+        
+        links = []
+        for route in routes:
+            url = f"/admin/PetriNET/route/{route.id}/change/"
+            links.append(f'<a href="{url}">{route.name}</a>')
+        return format_html(', '.join(links))
+    routes_list.short_description = 'Маршруты'
 
 
 @admin.register(TC)

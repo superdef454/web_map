@@ -54,7 +54,11 @@ class District(gis_models.Model):
 class TC(models.Model):
     name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250, unique=True)
     # TODO Добавить поле изображения для визализации что это за транспорт
-    capacity = models.SmallIntegerField(verbose_name="Вместимость")
+    capacity = models.SmallIntegerField(
+        verbose_name="Вместимость",
+        default=50,
+        validators=[MinValueValidator(1, message="Вместимость должна быть не менее 1")]
+    )
     description = models.TextField(verbose_name="Описание", null=True, blank=True)
 
     def __str__(self):
@@ -109,8 +113,16 @@ class Route(models.Model):
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название маршрута", max_length=250)
     tc = models.ForeignKey(TC, verbose_name="Тип транспортного средства", on_delete=models.SET_NULL, null=True)
-    interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", default=5)
-    amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
+    interval = models.SmallIntegerField(
+        verbose_name="Интервал движения в минутах",
+        default=10,
+        validators=[MinValueValidator(1, message="Интервал движения должен быть не менее 1 минуты")]
+    )
+    amount = models.SmallIntegerField(
+        verbose_name="Количество транспорта на маршруте",
+        default=1,
+        validators=[MinValueValidator(1, message="Количество транспорта должно быть не менее 1")]
+    )
     list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)
     list_coord_to_render = models.JSONField('Список координат для рендеринга', null=True)
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
