@@ -88,8 +88,8 @@ class BusStop(models.Model):
         ]
     )
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return f"{self.city.name}: {self.name} ({self.pk})"
 
     class Meta:
         verbose_name = 'Остановка'

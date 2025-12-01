@@ -333,9 +333,9 @@ class SimulationAdmin(admin.ModelAdmin):
                 with open(file_path, 'rb') as f:
                     response = HttpResponse(
                         f.read(), 
-                        content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
-                    response['Content-Disposition'] = f'attachment; filename="simulation_report_{simulation_id}.docx"'
+                    response['Content-Disposition'] = f'attachment; filename="simulation_report_{simulation_id}.xlsx"'
                     
                 # Удаляем временный файл после отправки
                 try:
