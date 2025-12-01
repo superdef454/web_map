@@ -21,6 +21,8 @@ fake = Faker("ru_RU")
 
 MAX_PASSENGERS_COUNT_FOR_RESPONSE = 10
 MAX_TIMEPOINTS_FOR_RESPONSE = 5000  # Лимит таймпоинтов для экономии памяти
+MAX_SIMULATION_TIME_MINUTES = 1440  # Максимальное время симуляции (24 часа)
+STALE_ITERATIONS_LIMIT = 5000  # Лимит итераций без изменения кол-ва пассажиров
 
 
 def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
@@ -31,19 +33,45 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
 
     # Получения маршрутов из бд
     routes = []
+    invalid_routes = []  # Маршруты с ошибками
     for request_route in request_data_to_calculate['routes']:
         route = Route.objects.filter(city_id=city_id,
                                      id=request_route['id']).prefetch_related('busstop').first()
-        # if not route:
-        #     route = Route.objects.filter(city_id=city_id,
-        #                                  name__icontains=request_route['name']).prefetch_related('busstop').first()
         if route:
-            routes.append(route)
+            # Проверка корректности маршрута
+            errors = []
+            
+            if not route.tc:
+                errors.append("не указан тип ТС")
+            elif route.tc.capacity < 1:
+                errors.append(f"вместимость ТС меньше 1 ({route.tc.capacity})")
+            
+            if not route.amount or route.amount < 1:
+                errors.append(f"кол-во автобусов меньше 1 ({route.amount})")
+            
+            if not route.interval or route.interval < 1:
+                errors.append(f"интервал движения меньше 1 ({route.interval})")
+            
+            if not route.list_coord or len(route.list_coord) < 2:
+                errors.append("маршрут должен содержать минимум 2 остановки")
+            
+            if errors:
+                invalid_routes.append(f"Маршрут '{route.name}' (ID={route.id}): {', '.join(errors)}")
+                logger.warning(f"Маршрут {route.id} не прошёл валидацию: {', '.join(errors)}")
+            else:
+                routes.append(route)
         else:
             logger.warning(f"Отсутствует маршрут, ID: {request_route['id']}")
 
     if not routes:
-        raise Exception("Отсутствуют маршруты")
+        error_msg = "Отсутствуют корректные маршруты для расчёта"
+        if invalid_routes:
+            error_msg += ". Ошибки: " + "; ".join(invalid_routes)
+        raise Exception(error_msg)
+    
+    if invalid_routes:
+        logger.warning(f"Некоторые маршруты пропущены: {'; '.join(invalid_routes)}")
+    
     DataToCalculate['routes'] = routes
 
     # Получение остановок и путей пассажиров
@@ -360,23 +388,28 @@ class PetriNet():
             return None, None
 
     def __init__(self, data_to_calculate: dict = {}) -> None:
+        logger.info("=== ИНИЦИАЛИЗАЦИЯ PetriNet ===")
         self.data_to_calculate = data_to_calculate
         self.routes = data_to_calculate['routes']
+        logger.info(f"Маршрутов: {len(self.routes)}")
         self.data_to_report = {'routes': {route.id: {'route': route,
                                                      'average_passengers_stops_count': [0, 0],
                                                      'average_fullness': [0, 0],
-                                                     'completed_trips': 0,  # Количество завершённых рейсов (достижений конечной)
+                                                     'completed_trips': 0,
                                                      } for route in self.routes}}
         # Список объектов остановок с пассажирами
         self.busstops: dict[int, PetriNet.BusStop] = {}
         self.busstops_cached: dict[int, BusStop] = {busstop.id: busstop for busstop in data_to_calculate['busstops']}
+        logger.info(f"Остановок в кэше: {len(self.busstops_cached)}")
         self.timeline = self.TimeLine(self.busstops)
         self.init_action()
         # Наверное переделать Имитацию работы онлайн с 400мс. на относительную скорость движения между actions
 
     def init_action(self):
         """Создание объектов для расчёта (пассажиров и автобусов)"""
+        logger.info("=== Создание объектов для расчёта ===")
         add_timepoints = []
+        total_buses = 0
 
         for route in self.routes:
             time = 0
@@ -393,10 +426,14 @@ class PetriNet():
                         }
                     })
                     time += route.interval * 60
+                    total_buses += 1
+        
+        logger.info(f"Создано автобусов: {total_buses}")
 
         if not add_timepoints:
             raise Exception("Отсутствуют автобусы на маршрутах")
 
+        total_passengers = 0
         for busstops_direction in self.data_to_calculate['busstops_directions']:
             bus_stop = self.busstops_cached[busstops_direction['busstop']]
             valid_bus_stops = list(BusStop.objects.filter(
@@ -413,7 +450,10 @@ class PetriNet():
                                        )
                 else:
                     passengers.extend(self.Passenger(bus_stop.id, direction) for pas in range(count))
+            total_passengers += len(passengers)
             self.busstops.update({bus_stop.id: self.BusStop(bus_stop, passengers)})
+        
+        logger.info(f"Создано пассажиров: {total_passengers}")
 
         if not self.busstops:
             raise Exception("Отсутствуют пассажиры")
@@ -423,6 +463,7 @@ class PetriNet():
                 self.busstops.update({busstop.id: self.BusStop(busstop, [])})
 
         self.timeline.add_list_timepoints(add_timepoints)
+        logger.info(f"Инициализация завершена. Таймпоинтов: {len(self.timeline.timeline)}")
 
     def _exists_pass_in_bus_path(self, bus_stop_ids_set: set[int]) -> bool:
         """Проверяем есть ли пассажиры на пути автобуса"""
@@ -430,12 +471,107 @@ class PetriNet():
             if busstop.passengers and busstop.bus_stop.id in bus_stop_ids_set:
                 return True
         return False
+    
+    def _log_stuck_passengers(self):
+        """Логирует информацию о застрявших пассажирах для диагностики"""
+        logger.info("=== ДИАГНОСТИКА ЗАСТРЯВШИХ ПАССАЖИРОВ ===")
+        
+        # Собираем все остановки из всех маршрутов
+        all_route_stops = set()
+        for route in self.routes:
+            for point in route.list_coord:
+                # Находим id остановки по координатам
+                for bs_id, bs in self.busstops_cached.items():
+                    if (abs(float(bs.latitude) - point[0]) < 0.0001 and 
+                        abs(float(bs.longitude) - point[1]) < 0.0001):
+                        all_route_stops.add(bs_id)
+                        break
+        
+        stuck_count = 0
+        for busstop_id, busstop in self.busstops.items():
+            if busstop.passengers:
+                logger.info(f"\nОстановка {busstop.bus_stop.name} (id={busstop_id}): {len(busstop.passengers)} пассажиров")
+                # Группируем по направлениям
+                destinations = {}
+                for pas in busstop.passengers:
+                    dest = pas.end_bus_stop_id
+                    if dest not in destinations:
+                        destinations[dest] = 0
+                    destinations[dest] += 1
+                
+                for dest_id, count in destinations.items():
+                    dest_name = self.busstops_cached.get(dest_id)
+                    dest_name = dest_name.name if dest_name else f"ID={dest_id}"
+                    reachable = "[OK] DOSTUPNA" if dest_id in all_route_stops else "[X] NEDOSTUPNA"
+                    logger.info(f"  -> {dest_name}: {count} chel. {reachable}")
+                    if dest_id not in all_route_stops:
+                        stuck_count += count
+        
+        logger.info(f"\nItogo passazhirov s nedostizhimymi napravleniyami: {stuck_count}")
 
     def Calculation(self):
         """Модуль расчёта"""
+        logger.info("=== НАЧАЛО РАСЧЁТА ===")
+        
+        # Счётчики для логирования
+        iteration_count = 0
+        log_interval = 1000  # Логировать каждые N итераций
+        total_passengers_boarded = 0
+        total_passengers_alighted = 0
+        
+        # Для отслеживания прогресса (обнаружение застревания)
+        last_passengers_count = -1
+        stale_iterations = 0
+        
+        # Подсчитываем начальное количество пассажиров
+        initial_passengers = sum(len(bs.passengers) for bs in self.busstops.values())
+        logger.info(f"Начальное кол-во пассажиров на остановках: {initial_passengers}")
+        
         this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
         
         while this_seconds_from_start is not None:
+            iteration_count += 1
+            
+            # Периодический вывод прогресса
+            time_minutes = this_seconds_from_start // 60
+            
+            if iteration_count % log_interval == 0:
+                remaining_passengers = sum(len(bs.passengers) for bs in self.busstops.values())
+                remaining_timepoints = len(self.timeline.timeline)
+                logger.info(
+                    f"Итерация {iteration_count}: "
+                    f"время={time_minutes} мин, "
+                    f"осталось пассажиров={remaining_passengers}, "
+                    f"таймпоинтов в очереди={remaining_timepoints}, "
+                    f"сохранено ответов={len(self.timeline.data_to_response)}"
+                )
+                
+                # Проверка на застревание
+                if remaining_passengers == last_passengers_count:
+                    stale_iterations += log_interval
+                else:
+                    stale_iterations = 0
+                    last_passengers_count = remaining_passengers
+                
+                # Принудительное завершение при застревании
+                if stale_iterations >= STALE_ITERATIONS_LIMIT:
+                    logger.warning(
+                        f"ЗАСТРЕВАНИЕ: {remaining_passengers} пассажиров не могут сесть. "
+                        f"Прошло {stale_iterations} итераций без изменений. Завершаем симуляцию."
+                    )
+                    self._log_stuck_passengers()
+                    break
+            
+            # Проверка лимита времени симуляции
+            if time_minutes > MAX_SIMULATION_TIME_MINUTES:
+                remaining_passengers = sum(len(bs.passengers) for bs in self.busstops.values())
+                logger.warning(
+                    f"ПРЕВЫШЕН ЛИМИТ ВРЕМЕНИ: {time_minutes} мин > {MAX_SIMULATION_TIME_MINUTES} мин. "
+                    f"Остаётся {remaining_passengers} необслуженных пассажиров."
+                )
+                self._log_stuck_passengers()
+                break
+            
             buses = this_action.get("Bus", [])
             
             for bus in buses:
@@ -453,6 +589,7 @@ class PetriNet():
                 
                 for pas in passengers_to_remove:
                     bus.passengers.remove(pas)
+                total_passengers_alighted += len(passengers_to_remove)
                 
                 if time_delta:
                     this_seconds_from_start += time_delta
@@ -479,6 +616,7 @@ class PetriNet():
                     route_stats['average_passengers_stops_count'][0] += pas.get_route_count(rest_route)
                     route_stats['average_passengers_stops_count'][1] += 1
                     time_delta += self.passenger_time
+                total_passengers_boarded += len(passengers_to_board)
                 
                 if time_delta:
                     this_seconds_from_start += time_delta
@@ -504,11 +642,24 @@ class PetriNet():
                     self.timeline.add_timepoint(this_seconds_from_start + time_delta, bus.get_action())
             
             this_seconds_from_start, this_action = self.timeline.pop_first_timepoint()
+        
+        # Финальная статистика
+        logger.info("=== РАСЧЁТ ЗАВЕРШЁН ===")
+        logger.info(f"Всего итераций: {iteration_count}")
+        logger.info(f"Пассажиров село: {total_passengers_boarded}")
+        logger.info(f"Пассажиров вышло: {total_passengers_alighted}")
+        logger.info(f"Таймпоинтов для отображения: {len(self.timeline.data_to_response)}")
+        
+        remaining_passengers = sum(len(bs.passengers) for bs in self.busstops.values())
+        if remaining_passengers > 0:
+            logger.warning(f"Осталось необслуженных пассажиров: {remaining_passengers}")
+        
         self.timeline.data_to_response.sort(key=lambda i: i[0])
         return self.timeline.data_to_response
 
     def CreateDataToReport(self) -> dict:
         """Собирает данные для отчёта"""
+        logger.info("=== ФОРМИРОВАНИЕ ОТЧЁТА ===")
         data_to_report = {}
         data_to_report['city_name'] = City.objects.get(id=self.data_to_calculate['city_id']).name
         data_to_report['data'] = str(datetime.datetime.now().isoformat(sep='_', timespec='seconds')).replace(':', '-')
@@ -556,9 +707,10 @@ class PetriNet():
             add_route['interval'] = route['route'].interval
             add_route['average_passengers_stops_count'] = round(route['average_passengers_stops_count'][0] /
                                                                 (route['average_passengers_stops_count'][1] or 1), 2)
+            tc_capacity = TC.capacity if TC else 1
             add_route['average_fullness'] = str(round((route['average_fullness'][0] /
                                                        (route['average_fullness'][1] or 1) /
-                                                       (TC.capacity or 1)) * 100, 2)) + '%'
+                                                       (tc_capacity or 1)) * 100, 2)) + '%'
             add_route['bus_stop_count'] = len(route['route'].busstop.all())
             # Расчёт протяжённости маршрута по координатам в порядке следования
             add_route['route_length'] = 0
