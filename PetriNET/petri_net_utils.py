@@ -590,6 +590,86 @@ class PetriNet():
         data_to_report['total_trips_count'] = sum(route['trips_count'] for route in data_to_report['routes'])
         return data_to_report
 
+    def combining_steps(self) -> list:
+        """
+        Объединяет шаги timeline для оптимизации отображения при нескольких маршрутах.
+        
+        Если маршрут один - возвращает исходный data_to_response без изменений.
+        Если маршрутов больше одного - объединяет последовательные шаги в блоки,
+        пока не встретится автобус, который уже есть в текущем блоке.
+        При объединении берётся максимальное время из всех объединяемых шагов.
+        
+        Returns:
+            list: Сжатый список кортежей (max_seconds_from_start, combined_action)
+        """
+        data_to_response = self.timeline.data_to_response
+        
+        # Если маршрут один или данных нет - возвращаем без изменений
+        if len(self.routes) <= 1 or not data_to_response:
+            return data_to_response
+        
+        combined_result = []
+        
+        # Текущий объединяемый блок
+        current_block_time = 0
+        current_block_buses = []  # Список автобусов в текущем блоке
+        current_block_bus_ids = set()  # Множество ID автобусов для быстрой проверки
+        current_block_busstops = []  # Остановки текущего блока
+        
+        for seconds_from_start, action in data_to_response:
+            buses_in_action = action.get('Bus', [])
+            busstops_in_action = action.get('BusStops', [])
+            
+            # Получаем уникальные идентификаторы автобусов в текущем действии
+            # Используем комбинацию route_id и bus_id для уникальности
+            action_bus_ids = set()
+            for bus in buses_in_action:
+                bus_unique_id = (bus.get('route_id'), bus.get('bus_id'))
+                action_bus_ids.add(bus_unique_id)
+            
+            # Проверяем, есть ли пересечение с уже добавленными автобусами
+            has_duplicate = bool(current_block_bus_ids & action_bus_ids)
+            
+            if has_duplicate and current_block_buses:
+                # Закрываем текущий блок и добавляем в результат
+                combined_action = {
+                    'Bus': current_block_buses,
+                    'BusStops': current_block_busstops
+                }
+                combined_result.append((current_block_time, combined_action))
+                
+                # Начинаем новый блок с текущего действия
+                current_block_time = seconds_from_start
+                current_block_buses = buses_in_action.copy()
+                current_block_bus_ids = action_bus_ids.copy()
+                current_block_busstops = busstops_in_action.copy()
+            else:
+                # Добавляем действие в текущий блок
+                # Обновляем время на максимальное
+                current_block_time = max(current_block_time, seconds_from_start)
+                
+                # Добавляем автобусы
+                current_block_buses.extend(buses_in_action)
+                current_block_bus_ids.update(action_bus_ids)
+                
+                # Обновляем остановки - берём последние актуальные данные
+                # (остановки с большим количеством пассажиров или более актуальные)
+                current_block_busstops = busstops_in_action.copy()
+        
+        # Добавляем последний блок, если он не пустой
+        if current_block_buses:
+            combined_action = {
+                'Bus': current_block_buses,
+                'BusStops': current_block_busstops
+            }
+            combined_result.append((current_block_time, combined_action))
+        
+        logger.info(
+            f"Объединение шагов timeline: было {len(data_to_response)}, стало {len(combined_result)}"
+        )
+        
+        return combined_result
+
 
 def CreateResponseFile(data_to_report: dict) -> str:
     city_name = data_to_report.get('city_name', '')

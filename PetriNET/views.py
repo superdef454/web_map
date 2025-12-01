@@ -909,8 +909,13 @@ class CalculationViewSet(viewsets.GenericViewSet):
         response = {'error': 0}
         
         if serializer.validated_data.get('get_timeline'):
-            response['calculate'] = calculate_result
-            logger.debug(f"Включены данные временной шкалы ({len(calculate_result)} точек)")
+            # Если больше одного маршрута - используем сжатую версию timeline
+            combined_timeline = petri_net.combining_steps()
+            response['calculate'] = combined_timeline
+            logger.debug(
+                f"Включены данные временной шкалы "
+                f"(исходных точек: {len(calculate_result)}, после объединения: {len(combined_timeline)})"
+            )
 
         response.update({
             'data_to_report': data_to_report,
