@@ -54,7 +54,11 @@ class District(gis_models.Model):
 class TC(models.Model):
     name = models.CharField(verbose_name="Название типа транспортного средства", max_length=250, unique=True)
     # TODO Добавить поле изображения для визализации что это за транспорт
-    capacity = models.SmallIntegerField(verbose_name="Вместимость")
+    capacity = models.SmallIntegerField(
+        verbose_name="Вместимость",
+        default=50,
+        validators=[MinValueValidator(1, message="Вместимость должна быть не менее 1")]
+    )
     description = models.TextField(verbose_name="Описание", null=True, blank=True)
 
     def __str__(self):
@@ -88,8 +92,8 @@ class BusStop(models.Model):
         ]
     )
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return f"{self.city.name}: {self.name} ({self.pk})"
 
     class Meta:
         verbose_name = 'Остановка'
@@ -109,14 +113,22 @@ class Route(models.Model):
     city = models.ForeignKey(City, verbose_name="Город", on_delete=models.CASCADE)
     name = models.CharField(verbose_name="Название маршрута", max_length=250)
     tc = models.ForeignKey(TC, verbose_name="Тип транспортного средства", on_delete=models.SET_NULL, null=True)
-    interval = models.SmallIntegerField(verbose_name="Интервал движения в минутах", default=5)
-    amount = models.SmallIntegerField(verbose_name="Количество транспорта на маршруте", null=True)
+    interval = models.SmallIntegerField(
+        verbose_name="Интервал движения в минутах",
+        default=10,
+        validators=[MinValueValidator(1, message="Интервал движения должен быть не менее 1 минуты")]
+    )
+    amount = models.SmallIntegerField(
+        verbose_name="Количество транспорта на маршруте",
+        default=1,
+        validators=[MinValueValidator(1, message="Количество транспорта должно быть не менее 1")]
+    )
     list_coord = models.JSONField('Список координат, по которым проходит маршрут', null=True)
     list_coord_to_render = models.JSONField('Список координат для рендеринга', null=True)
     busstop = models.ManyToManyField(BusStop, verbose_name='Остановки')
 
     def __str__(self):
-        return self.name
+        return f"{self.city.name}: {self.name}"
 
     class Meta:
         verbose_name = 'Маршрут'
@@ -133,6 +145,87 @@ class EI(models.Model):
     class Meta:
         verbose_name = 'Единица измерения'
         verbose_name_plural = 'Единицы измерения'
+
+
+class PassengerFlow(models.Model):
+    """Модель сценария пассажиропотока"""
+    city = models.ForeignKey(
+        City,
+        verbose_name="Город",
+        on_delete=models.CASCADE,
+        related_name='passenger_flows'
+    )
+    routes = models.ManyToManyField(
+        Route,
+        verbose_name="Маршруты",
+        blank=True,
+        related_name='passenger_flows',
+        help_text="Маршруты, участвующие в сценарии"
+    )
+    name = models.CharField(
+        verbose_name="Название сценария",
+        max_length=250
+    )
+    description = models.TextField(
+        verbose_name="Описание сценария",
+        blank=True,
+        null=True
+    )
+    created_at = models.DateTimeField(
+        verbose_name="Дата создания",
+        auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        verbose_name="Дата обновления",
+        auto_now=True
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.city.name})"
+
+    class Meta:
+        verbose_name = 'Сценарий пассажиропотока'
+        verbose_name_plural = 'Сценарии пассажиропотока'
+        ordering = ['-created_at']
+
+
+class PassengerFlowEntry(models.Model):
+    """Модель для описания записи пассажиропотока (откуда-куда и сколько)"""
+    passenger_flow = models.ForeignKey(
+        PassengerFlow,
+        verbose_name="Сценарий пассажиропотока",
+        on_delete=models.CASCADE,
+        related_name='entries'
+    )
+    from_stop = models.ForeignKey(
+        BusStop,
+        verbose_name="Остановка отправления",
+        on_delete=models.CASCADE,
+        related_name='passenger_flow_from'
+    )
+    to_stop = models.ForeignKey(
+        BusStop,
+        verbose_name="Остановка назначения",
+        on_delete=models.CASCADE,
+        related_name='passenger_flow_to',
+        blank=True,
+        null=True,
+        help_text="Если не указано, пассажиры распределяются по маршруту"
+    )
+    passengers_count = models.PositiveIntegerField(
+        verbose_name="Количество пассажиров",
+        validators=[MinValueValidator(1)],
+        help_text="Количество людей, следующих по данному направлению"
+    )
+
+    def __str__(self):
+        to_stop_name = self.to_stop.name if self.to_stop else "любую остановку"
+        return f"{self.from_stop.name} → {to_stop_name}: {self.passengers_count} чел."
+
+    class Meta:
+        verbose_name = 'Запись пассажиропотока'
+        verbose_name_plural = 'Записи пассажиропотока'
+        ordering = ['from_stop__name']
 
 
 class Simulation(models.Model):

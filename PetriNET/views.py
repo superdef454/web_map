@@ -2,9 +2,10 @@ import json
 import logging
 import os
 from typing import Any
+from urllib.parse import quote
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import FileResponse, JsonResponse
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import TemplateView
@@ -198,14 +199,23 @@ def download_report_file(request):
         
         # Получаем имя файла из пути
         filename = os.path.basename(file_path)
+        # Кодируем имя файла для корректной передачи кириллицы (RFC 5987)
+        encoded_filename = quote(filename)
         
-        # Открываем файл для скачивания с использованием контекстного менеджера
-        response = FileResponse(
-            open(file_path, 'rb'),
-            content_type='application/vnd.openxmlformats-officedocument'
-                        '.wordprocessingml.document'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        # Читаем файл и отдаём через HttpResponse для полного контроля над заголовками
+        from django.http import HttpResponse
+        with open(file_path, 'rb') as f:
+            response = HttpResponse(
+                f.read(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        
+        # ASCII fallback имя файла (без кириллицы)
+        ascii_filename = f"report_{data_to_report.get('data', 'unknown')}.xlsx"
+        
+        # Устанавливаем заголовки напрямую через headers (Django 3.2+)
+        response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
         
         return response
         

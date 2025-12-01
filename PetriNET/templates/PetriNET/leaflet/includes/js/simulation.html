@@ -171,11 +171,19 @@ function DownloadReport() {
         }
         // Получаем имя файла из заголовка Content-Disposition
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = 'report.docx';
+        let filename = 'report.xlsx';
         if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-            if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1];
+            // Сначала пробуем filename* (UTF-8 кодировка, RFC 5987)
+            const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+            if (filenameStarMatch && filenameStarMatch[1]) {
+                filename = decodeURIComponent(filenameStarMatch[1]);
+            } else {
+                // Иначе ищем обычный filename="..." или filename=...
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i) || 
+                                      contentDisposition.match(/filename=([^;\s]+)/i);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/"/g, '');
+                }
             }
         }
         return response.blob().then(blob => ({ blob, filename }));

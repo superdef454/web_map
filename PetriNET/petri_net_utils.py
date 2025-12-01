@@ -6,10 +6,11 @@ import os
 import random
 from decimal import Decimal
 
-from docx import Document
-from docx.shared import Pt
 from faker import Faker
 from geopy import distance
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, Side
+from openpyxl.utils import get_column_letter
 
 from .models import BusStop, City, Route
 
@@ -17,7 +18,7 @@ logger = logging.getLogger('PetriNetManager')
 
 fake = Faker("ru_RU")
 
-MAX_PASSENGERS_COUNT_FOR_RESPONSE = 100
+MAX_PASSENGERS_COUNT_FOR_RESPONSE = 10
 
 
 def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
@@ -28,19 +29,42 @@ def GetDataToCalculate(request_data_to_calculate: dict) -> dict:
 
     # Получения маршрутов из бд
     routes = []
+    invalid_routes = []  # Маршруты с ошибками
     for request_route in request_data_to_calculate['routes']:
         route = Route.objects.filter(city_id=city_id,
                                      id=request_route['id']).prefetch_related('busstop').first()
-        # if not route:
-        #     route = Route.objects.filter(city_id=city_id,
-        #                                  name__icontains=request_route['name']).prefetch_related('busstop').first()
         if route:
-            routes.append(route)
+            # Проверка корректности маршрута
+            errors = []
+            
+            if not route.tc:
+                errors.append("не указан тип ТС")
+            elif route.tc.capacity < 1:
+                errors.append(f"вместимость ТС меньше 1 ({route.tc.capacity})")
+            
+            if not route.amount or route.amount < 1:
+                errors.append(f"кол-во автобусов меньше 1 ({route.amount})")
+            
+            if not route.interval or route.interval < 1:
+                errors.append(f"интервал движения меньше 1 ({route.interval})")
+            
+            if not route.list_coord or len(route.list_coord) < 2:
+                errors.append("маршрут должен содержать минимум 2 остановки")
+            
+            if errors:
+                invalid_routes.append(f"Маршрут '{route.name}' (ID={route.id}): {', '.join(errors)}")
+                logger.warning(f"Маршрут {route.id} не прошёл валидацию: {', '.join(errors)}")
+            else:
+                routes.append(route)
         else:
             logger.warning(f"Отсутствует маршрут, ID: {request_route['id']}")
 
-    if not routes:
-        raise Exception("Отсутствуют маршруты")
+    if not routes or invalid_routes:
+        error_msg = "Отсутствуют корректные маршруты для расчёта"
+        if invalid_routes:
+            error_msg += ". Ошибки: " + "; ".join(invalid_routes)
+        raise Exception(error_msg)
+    
     DataToCalculate['routes'] = routes
 
     # Получение остановок и путей пассажиров
@@ -178,6 +202,10 @@ class PetriNet():
         def ending_station(self) -> bool:
             """Проверяет конечную станцию"""
             return True if self.bus_stop_index_now == len(self.route_list) - 1 else False
+        
+        def start_station(self) -> bool:
+            """Проверяет начальную станцию"""
+            return True if self.bus_stop_index_now == 0 else False
 
         def chech_of_travel_permit(self, busstops: 'PetriNet.BusStop', seconds_from_start: int) -> bool:
             """Проверяет что с текущей остановки достаточно давно выезжал автобус"""
@@ -344,6 +372,7 @@ class PetriNet():
         self.data_to_report = {'routes': {route.id: {'route': route,
                                                      'average_passengers_stops_count': [0, 0],
                                                      'average_fullness': [0, 0],
+                                                     'completed_trips': 0,  # Количество завершённых рейсов (достижений конечной)
                                                      } for route in self.routes}}
         # Список объектов остановок с пассажирами
         self.busstops: dict[int, PetriNet.BusStop] = {}
@@ -456,11 +485,12 @@ class PetriNet():
                     stop_intersections: set[int] = set(bus_stop_ids) & \
                         {busstop.bus_stop.id for busstop in self.busstops.values() if busstop.passengers}
                     return bool(stop_intersections)
+
                 # Автобус отправляется на следующую остановку,
                 # если она конечная: если есть пассажиры на его пути или в нём едем дальше, иначе останавливаемся
-                if bus.ending_station() and not (bus.passengers or
-                                                 exists_pass_in_bus_path(bus.bus_stop_ids)):
+                if (bus.ending_station() or bus.start_station()) and not bus.passengers and not exists_pass_in_bus_path(bus.bus_stop_ids):
                     # В этот момент можно у маркера отключить анимацию
+                    # Автобус завершил работу - на маршруте больше нет пассажиров
                     pass
                 else:
                     # При достижении начальной остановки, если за последние route.interval минут выезжал автобус
@@ -476,6 +506,9 @@ class PetriNet():
                         # Считаем среднюю наполненность
                         self.data_to_report['routes'][bus.route.id]['average_fullness'][0] += len(bus.passengers)
                         self.data_to_report['routes'][bus.route.id]['average_fullness'][1] += 1
+                        # Считаем завершённый рейс когда автобус достигает конечной остановки
+                        if bus.ending_station():
+                            self.data_to_report['routes'][bus.route.id]['completed_trips'] += 1
                         # Передвигаем автобус
                         bus.drive_to_next_bus_stop()
                     this_action["Bus"].remove(bus)
@@ -538,21 +571,23 @@ class PetriNet():
                                                        (route['average_fullness'][1] or 1) /
                                                        (TC.capacity or 1)) * 100, 2)) + '%'
             add_route['bus_stop_count'] = len(route['route'].busstop.all())
+            # Расчёт протяжённости маршрута по координатам в порядке следования
             add_route['route_length'] = 0
-            last_bus_stop = None
-            for now_bus_stop in route['route'].busstop.all():
-                if not last_bus_stop:
-                    last_bus_stop = now_bus_stop
-                    continue
-                add_route['route_length'] += get_travel_range(
-                    last_bus_stop.latitude,
-                    last_bus_stop.longitude,
-                    now_bus_stop.latitude,
-                    now_bus_stop.longitude,
+            list_coord = route['route'].list_coord
+            if list_coord and len(list_coord) > 1:
+                for i in range(len(list_coord) - 1):
+                    add_route['route_length'] += get_travel_range(
+                        list_coord[i][0],
+                        list_coord[i][1],
+                        list_coord[i + 1][0],
+                        list_coord[i + 1][1],
                     )
             add_route['route_length'] = round(add_route['route_length'], 2)
             add_route['TC_count'] = route['route'].amount
+            add_route['trips_count'] = route['completed_trips']
             data_to_report['routes'].append(add_route)
+        # Добавляем суммарное количество поездок (завершённых рейсов)
+        data_to_report['total_trips_count'] = sum(route['trips_count'] for route in data_to_report['routes'])
         return data_to_report
 
 
@@ -561,74 +596,169 @@ def CreateResponseFile(data_to_report: dict) -> str:
     date = data_to_report.get('data', '')
 
     path = 'media/reports/'
-    file_name = f'report_{city_name}_{date}.docx'
+    file_name = f'report_{city_name}_{date}.xlsx'
     file_path = path + file_name
     if os.path.isfile(file_path):
         return file_path
 
-    # Создаем новый документ Word
-    doc = Document()
-    style = doc.styles['Normal']
-    style.font.name = 'Times New Roman'
-    style.font.size = Pt(14)
+    # Создаем новый документ Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Отчёт"
+
+    # Стили
+    header_font = Font(name='Times New Roman', size=14, bold=True)
+    normal_font = Font(name='Times New Roman', size=14)
+    title_font = Font(name='Times New Roman', size=16, bold=True)
+    center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left_alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
 
     bus_stops = data_to_report.get('bus_stops', [])
     routes = data_to_report.get('routes', [])
 
-    # Добавляем заголовок
-    doc.add_paragraph(f'Результат расчёта нагрузки на транспортную сеть с использованием маршрутов: {", ".join([route["name"] for route in routes])} \n')
+    current_row = 1
 
-    doc.add_paragraph(f"Населённый пункт: {city_name}")
-    doc.add_paragraph(f"Дата: {date}\n")
+    # Заголовок отчёта
+    ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=9)
+    title_cell = ws.cell(row=current_row, column=1,
+                         value=f'Результат расчёта нагрузки на транспортную сеть с использованием маршрутов: {", ".join([route["name"] for route in routes])}')
+    title_cell.font = title_font
+    title_cell.alignment = left_alignment
+    ws.row_dimensions[current_row].height = 40
+    current_row += 2
 
-    # Добавляем таблицу автобусных остановок
+    # Информация о населённом пункте и дате
+    ws.cell(row=current_row, column=1, value=f"Населённый пункт: {city_name}").font = normal_font
+    current_row += 1
+    ws.cell(row=current_row, column=1, value=f"Дата: {date}").font = normal_font
+    current_row += 2
+
+    # Таблица автобусных остановок
     if bus_stops:
-        doc.add_paragraph('Автобусные остановки:')
-        table = doc.add_table(rows=1, cols=4)
-        table.style = 'Table Grid'
-        hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = 'Остановка'
-        hdr_cells[1].text = 'Количество пассажиров'
-        hdr_cells[2].text = 'Максимальное время ожидания автобуса, мин.'
-        hdr_cells[3].text = 'Количество маршрутов, шт.'
+        ws.cell(row=current_row, column=1, value='Автобусные остановки:').font = header_font
+        current_row += 1
+
+        bus_stop_headers = ['Остановка', 'Количество пассажиров',
+                           'Максимальное время ожидания автобуса, мин.', 'Количество маршрутов, шт.']
+
+        for col, header in enumerate(bus_stop_headers, 1):
+            cell = ws.cell(row=current_row, column=col, value=header)
+            cell.font = header_font
+            cell.alignment = center_alignment
+            cell.border = thin_border
+        current_row += 1
 
         for stop in bus_stops:
-            row_cells = table.add_row().cells
-            row_cells[0].text = stop.get('bus_name', '')
-            row_cells[1].text = str(stop.get('passengers_count', ''))
-            row_cells[2].text = str(stop.get('max_waiting_time', ''))
-            row_cells[3].text = str(stop.get('routes_count', ''))
+            row_data = [
+                stop.get('bus_name', ''),
+                stop.get('passengers_count', ''),
+                stop.get('max_waiting_time', ''),
+                stop.get('routes_count', '')
+            ]
+            for col, value in enumerate(row_data, 1):
+                cell = ws.cell(row=current_row, column=col, value=value)
+                cell.font = normal_font
+                cell.alignment = center_alignment
+                cell.border = thin_border
+            current_row += 1
 
-    # Добавляем таблицу маршрутов
+        current_row += 1
+
+    # Таблица маршрутов
     if routes:
-        doc.add_paragraph('\nМаршруты:')
-        table = doc.add_table(rows=1, cols=8)
-        table.style = 'Table Grid'
-        hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = 'Маршрут'
-        hdr_cells[1].text = 'Тип транспортного средства, Название, вместимость'
-        hdr_cells[2].text = 'Интервал движения автобусов, мин.'
-        hdr_cells[3].text = 'Средняя длительность пути пассажиров, кол-во ОП'
-        hdr_cells[4].text = 'Средняя наполненность автобусов, %'
-        hdr_cells[5].text = 'Количество остановок'
-        hdr_cells[6].text = 'Протяжённость, км.'
-        hdr_cells[7].text = 'Кол-во автобусов на маршруте'
+        ws.cell(row=current_row, column=1, value='Маршруты:').font = header_font
+        current_row += 1
+
+        route_headers = [
+            'Маршрут',
+            'Тип ТС, Название, вместимость',
+            'Интервал движения, мин.',
+            'Средняя длительность пути, кол-во ОП',
+            'Средняя наполненность, %',
+            'Количество остановок',
+            'Протяжённость, км.',
+            'Кол-во автобусов',
+            'Кол-во поездок'
+        ]
+
+        for col, header in enumerate(route_headers, 1):
+            cell = ws.cell(row=current_row, column=col, value=header)
+            cell.font = header_font
+            cell.alignment = center_alignment
+            cell.border = thin_border
+        current_row += 1
 
         for route in routes:
-            row_cells = table.add_row().cells
-            row_cells[0].text = route.get('name', '')
-            row_cells[1].text = route.get('TC', '')
-            row_cells[2].text = str(route.get('interval', ''))
-            row_cells[3].text = str(route.get('average_passengers_stops_count', ''))
-            row_cells[4].text = route.get('average_fullness', '')
-            row_cells[5].text = str(route.get('bus_stop_count', ''))
-            row_cells[6].text = str(route.get('route_length', ''))
-            row_cells[7].text = str(route.get('TC_count', ''))
+            row_data = [
+                route.get('name', ''),
+                route.get('TC', ''),
+                route.get('interval', ''),
+                route.get('average_passengers_stops_count', ''),
+                route.get('average_fullness', ''),
+                route.get('bus_stop_count', ''),
+                route.get('route_length', ''),
+                route.get('TC_count', ''),
+                route.get('trips_count', '')
+            ]
+            for col, value in enumerate(row_data, 1):
+                cell = ws.cell(row=current_row, column=col, value=value)
+                cell.font = normal_font
+                cell.alignment = center_alignment
+                cell.border = thin_border
+            current_row += 1
+
+        # Итоговая строка
+        total_trips = data_to_report.get('total_trips_count', 0)
+        for col in range(1, 10):
+            cell = ws.cell(row=current_row, column=col, value='')
+            cell.font = header_font
+            cell.alignment = center_alignment
+            cell.border = thin_border
+        ws.cell(row=current_row, column=1, value='Итого').font = header_font
+        ws.cell(row=current_row, column=9, value=total_trips).font = header_font
+
+    # Автоматическая ширина столбцов на основе содержимого
+    def get_column_width(text, font_size=14):
+        """Расчёт ширины столбца для Times New Roman 14"""
+        if text is None:
+            return 0
+        text = str(text)
+        # Коэффициент для Times New Roman 14 (примерно 1.2 символа на единицу ширины)
+        char_width = font_size * 0.15
+        # Учитываем переносы строк
+        lines = text.split('\n')
+        max_line_length = max(len(line) for line in lines) if lines else 0
+        return max_line_length * char_width + 2  # +2 для отступов
+
+    for col_idx in range(1, ws.max_column + 1):
+        max_width = 0
+        column_letter = get_column_letter(col_idx)
+        for row_idx in range(1, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            if cell.value:
+                cell_width = get_column_width(cell.value)
+                max_width = max(max_width, cell_width)
+        # Ограничиваем максимальную ширину для читаемости
+        max_width = min(max_width, 50)
+        max_width = max(max_width, 10)  # Минимальная ширина
+        ws.column_dimensions[column_letter].width = max_width
+
+    # Высота строк заголовков таблиц
+    for row_idx in range(1, ws.max_row + 1):
+        cell = ws.cell(row=row_idx, column=1)
+        if cell.font and cell.font.bold and cell.border and cell.border.top.style:
+            ws.row_dimensions[row_idx].height = 45
 
     if not os.path.exists(path):
         os.makedirs(path)
     # Сохраняем файл локально на сервере
-    doc.save(file_path)
+    wb.save(file_path)
 
     return file_path
 
