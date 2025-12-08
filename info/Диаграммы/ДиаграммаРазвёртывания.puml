@@ -13,7 +13,7 @@ node "Сервер" as server {
     
     node "Сервер приложений" as appserver {
         artifact "Gunicorn" as gunicorn {
-            component "Приложение WebMap" as django
+            component "Приложение OptiMove" as django
         }
         component "Workers [n]" as workers #lightgreen
     }
@@ -29,8 +29,15 @@ node "Компьютер (пользователя)" as client {
     }
 }
 
+node "Внешняя система" as ext_system {
+    artifact "REST API" as ext_process {
+        component "Интеграция с внешними сервисами" as integration
+    }
+}
+
 ' Определение связей между компонентами
 browser -down-> nginx : "Отправляет запросы HTTP/HTTPS"
+ext_process -down-> nginx : "Отправляет запросы HTTP/HTTPS"
 nginx -down-> gunicorn : "Проксирует и балансирует запросы"
 gunicorn --> workers : "Распределяет задачи"
 workers -down-> database : "Выполняет SQL-запросы"
